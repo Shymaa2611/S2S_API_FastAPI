@@ -28,4 +28,5 @@ transformers
 accelerate
 pyannote.audio
 onnxruntime
-
+fastapi
+install "uvicorn[standard]"

@@ -130,7 +130,7 @@ def make_prompt_audio(name,audio_path):
 
 # whisper model for speech to text process
 @app.post("/speech_to_text/")   
-def speech_to_text_process(segment):
+def speech_to_text_process(segment:AudioSegment):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -186,7 +186,7 @@ target  => arabic speeech
 """
 
 audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
-@app.post("/speech2speech/")
+#@app.post("/speech2speech/")
 def speech_to_speech_translation_en_ar(audio_url):
     session=Session()
     split_audio_segments(audio_url)
@@ -209,4 +209,9 @@ def get_audio(audio_url):
     session=Session()
     target_audio=session.query(AudioGeneration).first()
     return target_audio
+
+
+
+if __name__=="main":
+    speech_to_speech_translation_en_ar(audio_url)
    
