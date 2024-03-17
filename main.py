@@ -47,7 +47,7 @@ def create_segment(start_time: float, end_time: float, audio: AudioSegment, type
 def generate_target(audio: AudioSegment):
     session = Session()
     audio_bytes = BytesIO()
-    audio.export(audio_bytes, format='wav')
+    #audio.export(audio_bytes, format='wav')
     audio_bytes = audio_bytes.getvalue()
     target_audio = AudioGeneration(audio=audio_bytes)
     session.add(target_audio)
@@ -130,7 +130,7 @@ def make_prompt_audio(name,audio_path):
 
 # whisper model for speech to text process
 @app.post("/speech_to_text/")   
-def speech_to_text_process(segment:AudioSegment):
+def speech_to_text_process(segment):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -158,34 +158,41 @@ def text_to_speech(segment_id, target_text, audio_prompt):
     preload_models()
     session = Session()
     segment = session.query(Audio_segment).get(segment_id)
-    make_prompt_audio(name=segment_id,audio_path=audio_prompt)
-    audio_array = generate_audio(target_text,segment_id)
-    temp_file = f"new_audio_{segment_id}.wav"
-    sf.write(temp_file, audio_array, SAMPLE_RATE)  
-    with open(temp_file, "rb") as f:
-        segment.audio.save(f.name, File(f), save=False)
-        session.commit()
-        session.close()
-    os.remove(temp_file)
+    make_prompt_audio(name=f"audio_{segment_id}",audio_path=audio_prompt)
+    audio_array = generate_audio(target_text,f"audio_{segment_id}")
+    temp_file = BytesIO()
+    sf.write(temp_file, audio_array, SAMPLE_RATE, format='wav')
+    temp_file.seek(0)
+    segment.audio = temp_file.read()
+    session.commit()
+    session.close()
+    temp_file.close()
+    #os.remove(temp_file)
 
 
 def construct_audio():
     session = Session()
-    #should be ordered by start_time
-    segments = session.query(Audio_segment).order_by('start_time')
-    audio_files = [AudioSegment.from_file(segment.audio.path) for segment in segments]
-    target_audio = sum(audio_files,AudioSegment.empty())
+    # Should be ordered by start_time
+    segments = session.query(Audio_segment).order_by('start_time').all()
+    audio_files = []
+    for segment in segments:
+        audio_files.append(AudioSegment.from_file(BytesIO(segment.audio), format='wav'))
+    target_audio = sum(audio_files, AudioSegment.empty())
     target_audio_path = "target_audio.wav"
-    target_audio.export(target_audio_path, format="wav")
-    generate_target(audio=target_audio_path)
-    #delete all record in Audio_segment table
+    #target_audio.export(target_audio_path, format="wav")
+    generate_target(audio=target_audio.raw_data)
+    
+    # Delete all records in Audio_segment table
+    session.query(Audio_segment).delete()
+    session.commit()
+    session.close()
 
 """
 source  => english speech
 target  => arabic speeech
 """
 
-audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
+audio_url="/content/audio.wav"
 #@app.post("/speech2speech/")
 def speech_to_speech_translation_en_ar(audio_url):
     session=Session()
@@ -196,7 +203,7 @@ def speech_to_speech_translation_en_ar(audio_url):
         text = speech_to_text_process(audio_data)
         target_text=text_to_text_translation(text)
         segment_id = segment.id
-        text_to_speech(segment_id,target_text,audio_data)
+        text_to_speech(segment_id,"hello",segment.audio)
     construct_audio()
     return JSONResponse(status_code=200, content={"status_code": 200})
 
@@ -212,5 +219,6 @@ def get_audio(audio_url):
 
 
 if __name__=="main":
-    speech_to_speech_translation_en_ar(audio_url)
+    #speech_to_speech_translation_en_ar(audio_url)
+    get_audio(audio_url)
    
