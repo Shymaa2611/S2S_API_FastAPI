@@ -3,7 +3,6 @@ transformers
 pydub
 soundfile
 numpy
-torch
 torchvision
 torchaudio
 tokenizers
@@ -29,4 +28,5 @@ accelerate
 pyannote.audio
 onnxruntime
 fastapi
-install "uvicorn[standard]"
+uvicorn[standard]
+pytest

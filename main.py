@@ -196,14 +196,21 @@ audio_url="/content/audio.wav"
 #@app.post("/speech2speech/")
 def speech_to_speech_translation_en_ar(audio_url):
     session=Session()
+    target_text=None
     split_audio_segments(audio_url)
     speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
     for segment in speech_segments:
         audio_data = segment.audio
         text = speech_to_text_process(audio_data)
-        target_text=text_to_text_translation(text)
+        if text:
+            target_text=text_to_text_translation(text)
+        else:
+            print("speech_to_text_process function not return result. ")
         segment_id = segment.id
-        text_to_speech(segment_id,"hello",segment.audio)
+        if target_text is None:
+            print("Target text is None.")
+        else:
+           text_to_speech(segment_id,target_text,segment.audio)
     construct_audio()
     return JSONResponse(status_code=200, content={"status_code": 200})
 
