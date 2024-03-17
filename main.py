@@ -157,7 +157,7 @@ def speech_to_text_process(segment:AudioSegment):
 def text_to_speech(segment_id, target_text, audio_prompt):
     preload_models()
     session = Session()
-    segment = session.query(Audio_segment).get(id=segment_id)
+    segment = session.query(Audio_segment).get(segment_id)
     make_prompt_audio(name=segment_id,audio_path=audio_prompt)
     audio_array = generate_audio(target_text,segment_id)
     temp_file = f"new_audio_{segment_id}.wav"
@@ -196,8 +196,7 @@ def speech_to_speech_translation_en_ar(audio_url):
         text = speech_to_text_process(audio_data)
         target_text=text_to_text_translation(text)
         segment_id = segment.id
-        audio_file_path = segment.audio.path
-        text_to_speech(segment_id,target_text,audio_file_path)
+        text_to_speech(segment_id,target_text,audio_data)
     construct_audio()
     return JSONResponse(status_code=200, content={"status_code": 200})
 
