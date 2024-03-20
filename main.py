@@ -5,7 +5,6 @@ from s2smodels import Base, Audio_segment, AudioGeneration
 from pydub import AudioSegment
 import os
 import torch
-import base64
 from fastapi.responses import JSONResponse
 from utils.prompt_making import make_prompt
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
@@ -30,7 +29,7 @@ Base.metadata.create_all(engine)
 def root():
     return {"message": "No result"}
 
-#@app.post("/create_segment/")
+#add audio segements in database
 def create_segment(start_time: float, end_time: float, audio: AudioSegment, type: str):
     session = Session()
     audio_bytes = BytesIO()
@@ -44,7 +43,7 @@ def create_segment(start_time: float, end_time: float, audio: AudioSegment, type
     return {"status_code": 200, "message": "success"}
 
 
-#@app.post("/generate_target/")
+#add target audio
 def generate_target(audio: AudioSegment):
     session = Session() 
     audio_bytes = BytesIO()
@@ -153,6 +152,7 @@ def speech_to_text_process(segment):
     return result["text"]
 
 #text to speech using VALL-E-X model 
+@app.post("/text_to_speech/")  
 def text_to_speech(segment_id, target_text, audio_prompt):
     preload_models()
     session = Session()
@@ -213,40 +213,43 @@ def speech_to_speech_translation_en_ar(audio_url):
 
 
 
-@app.get("/generate_audio/")
+@app.get("/get_target_audio/")
 def get_audio(audio_url):
     speech_to_speech_translation_en_ar(audio_url)
-    session=Session()
-    target_audio=session.query(AudioGeneration).first()
-    return target_audio
-
-@app.get("/get_first/")
-def get_first_audio():
-    session=Session()
-    first_audio_generation = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
-    if first_audio_generation is None:
-        raise ValueError("No audio found in the database")
-    audio_bytes = first_audio_generation.audio
-    audio_segment = AudioSegment.from_file(BytesIO(audio_bytes))
-
-    return audio_segment
-
-@app.get("/get_first_2/")
-def get_first2_audio():
     session = Session()
     first_audio_generation = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
     if first_audio_generation is None:
         raise ValueError("No audio found in the database")
-
     audio_bytes = first_audio_generation.audio
     file_path = "target_audio.wav"
     with open(file_path, "wb") as file:
         file.write(audio_bytes)
-
     session.close()
-    return file_path
+    return {"audio_url":file_path}
 
- 
+    
+@app.get("/audio_segments/")
+def get_all_audio_segments():
+        session=Session()
+        segments = session.query(Audio_segment).all()
+        segment_dicts = []
+        for segment in segments:
+            if segment.audio is None:
+                raise ValueError("No audio found in the database")
+
+            audio_bytes = segment.audio
+            file_path = f"segments//segment{segment.id}_audio.wav"
+            with open(file_path, "wb") as file:
+               file.write(audio_bytes)
+            segment_dicts.append({
+                "id": segment.id,
+                "start_time": segment.start_time,
+                "end_time": segment.end_time,
+                "type": segment.type,
+                "audio_url":file_path
+            })
+        session.close()
+        return {"segments":segment_dicts}
 
 
 
@@ -255,6 +258,8 @@ def get_first2_audio():
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
     audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
+    all_segments = get_all_audio_segments()
+    #print(all_segments)
     #split_audio_segments(audio_url)
     #first_Audio=get_first2_audio()
     #construct_audio()
