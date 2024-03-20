@@ -7,7 +7,7 @@
    convert spoken words into text, machine translation (MT) to translate the text, and text-to-speech (TTS) synthesis to convert the translated text back into  speech. 
 
 ### AI Models
-- segmentation model (pyannote)
+- segmentation model 
 - automatic speech recognition (Whisper)
 - machine translation (Marefa)
 - text to speech (VALL-E-X)
