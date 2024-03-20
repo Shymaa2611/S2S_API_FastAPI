@@ -5,6 +5,7 @@ from s2smodels import Base, Audio_segment, AudioGeneration
 from pydub import AudioSegment
 import os
 import torch
+import base64
 from fastapi.responses import JSONResponse
 from utils.prompt_making import make_prompt
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
@@ -45,9 +46,9 @@ def create_segment(start_time: float, end_time: float, audio: AudioSegment, type
 
 #@app.post("/generate_target/")
 def generate_target(audio: AudioSegment):
-    session = Session()
+    session = Session() 
     audio_bytes = BytesIO()
-    #audio.export(audio_bytes, format='wav')
+    audio.export(audio_bytes, format='wav')
     audio_bytes = audio_bytes.getvalue()
     target_audio = AudioGeneration(audio=audio_bytes)
     session.add(target_audio)
@@ -55,8 +56,6 @@ def generate_target(audio: AudioSegment):
     session.close()
 
     return {"status_code": 200, "message": "success"}
-
-
 """
 audio segmentation into speech and non-speech using pyannote segmentation model
 """
@@ -178,9 +177,8 @@ def construct_audio():
     for segment in segments:
         audio_files.append(AudioSegment.from_file(BytesIO(segment.audio), format='wav'))
     target_audio = sum(audio_files, AudioSegment.empty())
-    target_audio_path = "target_audio.wav"
     #target_audio.export(target_audio_path, format="wav")
-    generate_target(audio=target_audio.raw_data)
+    generate_target(audio=target_audio)
     
     # Delete all records in Audio_segment table
     session.query(Audio_segment).delete()
@@ -192,7 +190,6 @@ source  => english speech
 target  => arabic speeech
 """
 
-audio_url="/content/audio.wav"
 #@app.post("/speech2speech/")
 def speech_to_speech_translation_en_ar(audio_url):
     session=Session()
@@ -223,9 +220,42 @@ def get_audio(audio_url):
     target_audio=session.query(AudioGeneration).first()
     return target_audio
 
+@app.get("/get_first/")
+def get_first_audio():
+    session=Session()
+    first_audio_generation = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
+    if first_audio_generation is None:
+        raise ValueError("No audio found in the database")
+    audio_bytes = first_audio_generation.audio
+    audio_segment = AudioSegment.from_file(BytesIO(audio_bytes))
+
+    return audio_segment
+
+@app.get("/get_first_2/")
+def get_first2_audio():
+    session = Session()
+    first_audio_generation = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
+    if first_audio_generation is None:
+        raise ValueError("No audio found in the database")
+
+    audio_bytes = first_audio_generation.audio
+    file_path = "target_audio.wav"
+    with open(file_path, "wb") as file:
+        file.write(audio_bytes)
+
+    session.close()
+    return file_path
+
+ 
+
+
+
 
 
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
-    get_audio(audio_url)
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
+    #split_audio_segments(audio_url)
+    #first_Audio=get_first2_audio()
+    #construct_audio()
    
