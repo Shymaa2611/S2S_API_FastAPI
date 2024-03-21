@@ -13,7 +13,6 @@ class Audio_segment(Base):
 
 
 #create audio_generation table
-
 class AudioGeneration(Base):
     __tablename__ = "audioGeneration"
     id = Column(Integer, primary_key=True)

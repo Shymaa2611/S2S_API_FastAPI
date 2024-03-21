@@ -162,7 +162,7 @@ def text_to_speech(segment_id, target_text, audio_prompt):
     temp_file = BytesIO()
     sf.write(temp_file, audio_array, SAMPLE_RATE, format='wav')
     temp_file.seek(0)
-    segment.audio = temp_file.read()
+    segment.audio = temp_file.getvalue()
     session.commit()
     session.close()
     temp_file.close()
@@ -203,10 +203,10 @@ def speech_to_speech_translation_en_ar(audio_url):
             target_text=text_to_text_translation(text)
         else:
             print("speech_to_text_process function not return result. ")
-        segment_id = segment.id
         if target_text is None:
             print("Target text is None.")
         else:
+           segment_id = segment.id
            text_to_speech(segment_id,target_text,segment.audio)
     construct_audio()
     return JSONResponse(status_code=200, content={"status_code": 200})
@@ -264,5 +264,7 @@ if __name__=="main":
     #first_Audio=get_first2_audio()
     #construct_audio()
     #data=get_audio(audio_url)
+    #file_path=get_audio(audio_url)
+
     print("Done!")
    
