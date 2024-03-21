@@ -217,10 +217,10 @@ def speech_to_speech_translation_en_ar(audio_url):
 def get_audio(audio_url):
     speech_to_speech_translation_en_ar(audio_url)
     session = Session()
-    first_audio_generation = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
-    if first_audio_generation is None:
+    target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
+    if target_audio  is None:
         raise ValueError("No audio found in the database")
-    audio_bytes = first_audio_generation.audio
+    audio_bytes = target_audio.audio
     file_path = "target_audio.wav"
     with open(file_path, "wb") as file:
         file.write(audio_bytes)
@@ -258,9 +258,11 @@ def get_all_audio_segments():
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
     audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
-    all_segments = get_all_audio_segments()
+    #all_segments = get_all_audio_segments()
     #print(all_segments)
     #split_audio_segments(audio_url)
     #first_Audio=get_first2_audio()
     #construct_audio()
+    #data=get_audio(audio_url)
+    print("Done!")
    
