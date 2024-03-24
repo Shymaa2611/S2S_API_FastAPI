@@ -5,6 +5,7 @@ from s2smodels import Base, Audio_segment, AudioGeneration
 from pydub import AudioSegment
 import os
 import torch
+from  googletrans import Translator
 from fastapi.responses import JSONResponse
 from utils.prompt_making import make_prompt
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
@@ -110,13 +111,9 @@ def split_audio_segments(audio_url):
 
 @app.post("/translate/")
 def text_to_text_translation(text):
-    mname = "marefa-nlp/marefa-mt-en-ar"
-    tokenizer = MarianTokenizer.from_pretrained(mname)
-    model = MarianMTModel.from_pretrained(mname)
-    translated_tokens = model.generate(**tokenizer.prepare_seq2seq_batch([text], return_tensors="pt"))
-    translated_text = [tokenizer.decode(t, skip_special_tokens=True) for t in translated_tokens]
-    translated_text=" ".join(translated_text)
-    return translated_text
+    translator=Translator()
+    translate_text=translator.translate(text,dest='zh-CN',src='en')
+    return translate_text.text
 
 def make_prompt_audio(name,audio_path):
     make_prompt(name=name, audio_prompt_path=audio_path)
@@ -216,7 +213,7 @@ def speech_to_speech_translation_en_ar(audio_url):
 
 @app.get("/get_target_audio/")
 def get_audio(audio_url):
-    #speech_to_speech_translation_en_ar(audio_url)
+    speech_to_speech_translation_en_ar(audio_url)
     session = Session()
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
     if target_audio  is None:
@@ -298,7 +295,7 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
-    audio_url="D:\\MachineCourse\\EN2009c.Array1-01.wav"
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
     #all_segments = get_all_audio_segments()
     #print(all_segments)
     #split_audio_segments(audio_url)
@@ -307,8 +304,8 @@ if __name__=="main":
     #data=get_audio(audio_url)
     #file_path=get_audio(audio_url)
     #split_audio_segments(audio_url)
-    #data=get_audio(audio_url)
-    construct_audio()
+    data=get_audio(audio_url)
+    #construct_audio()
 
     print("Done!")
    
