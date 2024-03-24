@@ -12,9 +12,10 @@ from transformers import MarianTokenizer, MarianMTModel
 from utils.generation import SAMPLE_RATE, generate_audio, preload_models
 from scipy.io.wavfile import write as write_wav
 import shutil
-from pyannote.audio import Model
-from pyannote.audio.pipelines import VoiceActivityDetection
+#from pyannote.audio import Model
+#from pyannote.audio.pipelines import VoiceActivityDetection
 from io import BytesIO
+from pyannote.audio import Pipeline
 import soundfile as sf
 DATABASE_URL = "sqlite:///./sql_app.db"
 engine = create_engine(DATABASE_URL)
@@ -59,18 +60,12 @@ def generate_target(audio: AudioSegment):
 audio segmentation into speech and non-speech using pyannote segmentation model
 """
 def audio_speech_nonspeech_detection(audio_url):
-    model = Model.from_pretrained(
-     "pyannote/segmentation-3.0", 
-      use_auth_token="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")
-    pipeline = VoiceActivityDetection(segmentation=model)
-    HYPER_PARAMETERS = {
-      "min_duration_on": 0.0,
-      "min_duration_off": 0.0
-     }
-    pipeline.instantiate(HYPER_PARAMETERS)
-    vad = pipeline(audio_url)
+    pipeline = Pipeline.from_pretrained(
+     "pyannote/speaker-diarization-3.0",
+    use_auth_token="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")
+    diarization = pipeline(audio_url)
     speaker_regions=[]
-    for turn, _,speaker in vad.itertracks(yield_label=True):
+    for turn, _,speaker in  diarization.itertracks(yield_label=True):
          speaker_regions.append({"start":turn.start,"end":turn.end})
     sound = AudioSegment.from_wav(audio_url)
     speaker_regions.sort(key=lambda x: x['start'])
@@ -207,7 +202,13 @@ def speech_to_speech_translation_en_ar(audio_url):
             print("Target text is None.")
         else:
            segment_id = segment.id
-           text_to_speech(segment_id,target_text,segment.audio)
+           segment_duration = segment.end_time - segment.start_time
+           if segment_duration <=15:
+                text_to_speech(segment_id,target_text,segment.audio)
+           else:
+                audio_data=extract_15_seconds(segment.audio,segment.start_time,segment.end_time)
+                text_to_speech(segment_id,target_text,audio_data)
+                os.remove(audio_data)
     construct_audio()
     return JSONResponse(status_code=200, content={"status_code": 200})
 
@@ -215,7 +216,7 @@ def speech_to_speech_translation_en_ar(audio_url):
 
 @app.get("/get_target_audio/")
 def get_audio(audio_url):
-    speech_to_speech_translation_en_ar(audio_url)
+    #speech_to_speech_translation_en_ar(audio_url)
     session = Session()
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
     if target_audio  is None:
@@ -253,11 +254,51 @@ def get_all_audio_segments():
 
 
 
+""" 
+def speech_to_speech_translation_en_zh(audio_url):
+    session=Session()
+    target_text=None
+    zh_text=["第十六章","我本可以用几行文字告诉你这次联络的开始，但我想让你看到我们走过的每一步，我同意玛格丽特的任何愿望"]
+    count=0
+    split_audio_segments(audio_url)
+    speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
+    for segment in speech_segments:
+        audio_data = segment.audio
+        if segment.end_time -segment.start_time <15
+        if count<2:
+        #text = speech_to_text_process(audio_data)
+        #if text:
+        #   target_text=text_to_text_translation(text)
+        #else:
+         #   print("speech_to_text_process function not return result. ")
+        #if target_text is None:
+        #    print("Target text is None.")
+        #else:
+            segment_id = segment.id
+            text_to_speech(segment_id,zh_text[count],segment.audio)
+            count+=1
+        else:
+            break
+    construct_audio()
+    return JSONResponse(status_code=200, content={"status_code": 200})
+
+ """
+
+
+def extract_15_seconds(audio_data, start_time, end_time):
+    audio_segment = AudioSegment.from_file(BytesIO(audio_data), format='wav')
+    start_ms = start_time * 1000  
+    end_ms = min((start_time + 15) * 1000, end_time * 1000)  
+    extracted_segment = audio_segment[start_ms:end_ms]
+    temp_wav_path = "temp.wav"
+    extracted_segment.export(temp_wav_path, format="wav")
+
+    return temp_wav_path
 
 
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
-    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
+    audio_url="D:\\MachineCourse\\EN2009c.Array1-01.wav"
     #all_segments = get_all_audio_segments()
     #print(all_segments)
     #split_audio_segments(audio_url)
@@ -265,6 +306,9 @@ if __name__=="main":
     #construct_audio()
     #data=get_audio(audio_url)
     #file_path=get_audio(audio_url)
+    #split_audio_segments(audio_url)
+    #data=get_audio(audio_url)
+    construct_audio()
 
     print("Done!")
    
