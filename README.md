@@ -12,7 +12,7 @@
 - machine translation (Marefa)
 - text to speech (VALL-E-X)
 
-![S2ST](api_process.jpg)
+![S2ST](api_process_image.jpg)
 
 ## Framework 
 - FASTAPI
