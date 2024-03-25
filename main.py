@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from s2smodels import Base, Audio_segment, AudioGeneration
@@ -9,12 +9,9 @@ from  googletrans import Translator
 from fastapi.responses import JSONResponse
 from utils.prompt_making import make_prompt
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-from transformers import MarianTokenizer, MarianMTModel
 from utils.generation import SAMPLE_RATE, generate_audio, preload_models
 from scipy.io.wavfile import write as write_wav
 import shutil
-#from pyannote.audio import Model
-#from pyannote.audio.pipelines import VoiceActivityDetection
 from io import BytesIO
 from pyannote.audio import Pipeline
 import soundfile as sf
@@ -31,7 +28,7 @@ Base.metadata.create_all(engine)
 def root():
     return {"message": "No result"}
 
-#add audio segements in database
+#add audio segements in Audio_segment Table
 def create_segment(start_time: float, end_time: float, audio: AudioSegment, type: str):
     session = Session()
     audio_bytes = BytesIO()
@@ -45,7 +42,7 @@ def create_segment(start_time: float, end_time: float, audio: AudioSegment, type
     return {"status_code": 200, "message": "success"}
 
 
-#add target audio
+#add target audio to AudioGeneration Table
 def generate_target(audio: AudioSegment):
     session = Session() 
     audio_bytes = BytesIO()
@@ -58,7 +55,7 @@ def generate_target(audio: AudioSegment):
 
     return {"status_code": 200, "message": "success"}
 """
-audio segmentation into speech and non-speech using pyannote segmentation model
+audio segmentation into speech and non-speech using segmentation model
 """
 def audio_speech_nonspeech_detection(audio_url):
     pipeline = Pipeline.from_pretrained(
@@ -86,7 +83,7 @@ def audio_speech_nonspeech_detection(audio_url):
     return speaker_regions,non_speech_regions
 
 """
-save speech and non-speech segments in database 
+save speech and non-speech segments in audio_segment table
 """
 def split_audio_segments(audio_url):
     sound = AudioSegment.from_wav(audio_url)
@@ -114,6 +111,7 @@ def text_to_text_translation(text):
     translator=Translator()
     translate_text=translator.translate(text,dest='zh-CN',src='en')
     return translate_text.text
+
 
 def make_prompt_audio(name,audio_path):
     make_prompt(name=name, audio_prompt_path=audio_path)
@@ -160,7 +158,10 @@ def text_to_speech(segment_id, target_text, audio_prompt):
     temp_file.close()
     #os.remove(temp_file)
 
-
+"""
+reconstruct target audio using all updated segment
+in audio_segment table and then remove all audio_Segment records
+"""
 def construct_audio():
     session = Session()
     # Should be ordered by start_time
@@ -169,7 +170,6 @@ def construct_audio():
     for segment in segments:
         audio_files.append(AudioSegment.from_file(BytesIO(segment.audio), format='wav'))
     target_audio = sum(audio_files, AudioSegment.empty())
-    #target_audio.export(target_audio_path, format="wav")
     generate_target(audio=target_audio)
     
     # Delete all records in Audio_segment table
@@ -187,6 +187,7 @@ def speech_to_speech_translation_en_ar(audio_url):
     session=Session()
     target_text=None
     split_audio_segments(audio_url)
+    #filtering by type
     speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
     for segment in speech_segments:
         audio_data = segment.audio
@@ -215,6 +216,7 @@ def speech_to_speech_translation_en_ar(audio_url):
 def get_audio(audio_url):
     speech_to_speech_translation_en_ar(audio_url)
     session = Session()
+    #get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
     if target_audio  is None:
         raise ValueError("No audio found in the database")
@@ -251,37 +253,6 @@ def get_all_audio_segments():
 
 
 
-""" 
-def speech_to_speech_translation_en_zh(audio_url):
-    session=Session()
-    target_text=None
-    zh_text=["第十六章","我本可以用几行文字告诉你这次联络的开始，但我想让你看到我们走过的每一步，我同意玛格丽特的任何愿望"]
-    count=0
-    split_audio_segments(audio_url)
-    speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
-    for segment in speech_segments:
-        audio_data = segment.audio
-        if segment.end_time -segment.start_time <15
-        if count<2:
-        #text = speech_to_text_process(audio_data)
-        #if text:
-        #   target_text=text_to_text_translation(text)
-        #else:
-         #   print("speech_to_text_process function not return result. ")
-        #if target_text is None:
-        #    print("Target text is None.")
-        #else:
-            segment_id = segment.id
-            text_to_speech(segment_id,zh_text[count],segment.audio)
-            count+=1
-        else:
-            break
-    construct_audio()
-    return JSONResponse(status_code=200, content={"status_code": 200})
-
- """
-
-
 def extract_15_seconds(audio_data, start_time, end_time):
     audio_segment = AudioSegment.from_file(BytesIO(audio_data), format='wav')
     start_ms = start_time * 1000  
@@ -303,9 +274,9 @@ if __name__=="main":
     #construct_audio()
     #data=get_audio(audio_url)
     #file_path=get_audio(audio_url)
-    #split_audio_segments(audio_url)
-    data=get_audio(audio_url)
-    #construct_audio()
+    split_audio_segments(audio_url)
+    #data=get_audio(audio_url)
+    construct_audio()
 
     print("Done!")
    
