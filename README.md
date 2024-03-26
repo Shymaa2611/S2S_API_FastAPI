@@ -9,7 +9,7 @@
 ### AI Models
 - segmentation model 
 - automatic speech recognition (Whisper)
-- machine translation (Marefa)
+- machine translation (Google translation)
 - text to speech (VALL-E-X)
 
 ![S2ST](api_process_image.jpg)
@@ -18,6 +18,7 @@
 - FASTAPI
 
 ### Running
+  - http://127.0.0.1:8000 
 
 ### Deploy
 
