@@ -1,9 +1,8 @@
 {
-    "devCommand": "uvicorn main:app --host 0.0.0.0 --port 3000",
     "version": 2,
     "routes": [
     {
-      "src": "/(.*)",
+      "src": "main.py",
       "dest": "/"
     }
   ]
