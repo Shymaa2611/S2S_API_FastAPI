@@ -16,11 +16,6 @@ from io import BytesIO
 from pyannote.audio import Pipeline
 import soundfile as sf
 from fastapi_cors import CORS
-from dotenv import load_dotenv
-import uvicorn
-load_dotenv()
-PORT = int(os.get('PORT', 8000))
-HOST = '0.0.0.0'
 DATABASE_URL = "sqlite:///./sql_app.db"
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
@@ -294,6 +289,6 @@ if __name__=="main":
     #data=get_audio(audio_url)
     #all_segments = get_all_audio_segments()
 
-    #print("Done!")
-    uvicorn.run('app.api:app', host = HOST, port = PORT, reload = True)
+    print("Done!")
+    
    
