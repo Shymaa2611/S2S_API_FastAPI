@@ -2,9 +2,13 @@
     "version": 2,
     "routes": [
     {
-      "src": "main.py",
+      "src": "/",
       "dest": "/"
-    }
+    },
+    {
+        "src": "/",
+        "dest": "/docs"
+      }
   ]
   }
   
