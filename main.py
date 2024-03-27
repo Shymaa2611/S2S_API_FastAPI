@@ -30,6 +30,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 Base.metadata.create_all(engine)
 
 
@@ -227,6 +228,10 @@ def get_audio(audio_url):
     session = Session()
     #get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
+    #remove target audio from database
+    session.query(AudioGeneration).delete()
+    session.commit()
+    session.close()
     if target_audio  is None:
         raise ValueError("No audio found in the database")
     audio_bytes = target_audio.audio
@@ -275,7 +280,7 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
-    #audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
     #all_segments = get_all_audio_segments()
     #print(all_segments)
     #split_audio_segments(audio_url)
@@ -286,7 +291,7 @@ if __name__=="main":
     #split_audio_segments(audio_url)
     #data=get_audio(audio_url)
     #construct_audio()
-    #data=get_audio(audio_url)
+    data=get_audio(audio_url)
     #all_segments = get_all_audio_segments()
 
     print("Done!")
