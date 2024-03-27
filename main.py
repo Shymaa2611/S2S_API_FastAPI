@@ -101,11 +101,17 @@ def split_audio_segments(audio_url):
     # Process speech segments
     for i, speech_segment in enumerate(speech_segments):
         start = int(speech_segment['start'] * 1000)  
-        end = int(speech_segment['end'] * 1000)  
-        segment = sound[start:end]
-        create_segment(start_time=start/1000,
-            end_time=end/1000,
+        end = int(speech_segment['end'] * 1000)
+        #split segemt into 15 seconds
+        current_time = start
+        while current_time < end:
+            segment_end = min(current_time + 15000, end)
+            segment = sound[current_time:segment_end]
+            create_segment(start_time=current_time / 1000,
+            end_time=segment_end / 1000,
             type="speech",audio=segment)
+            current_time = segment_end
+
     
     # Process non-speech segments 
     for i, non_speech_segment in enumerate(non_speech_segment):
@@ -210,13 +216,7 @@ def speech_to_speech_translation_en_ar(audio_url):
             print("Target text is None.")
         else:
            segment_id = segment.id
-           segment_duration = segment.end_time - segment.start_time
-           if segment_duration <=15:
-                text_to_speech(segment_id,target_text,segment.audio)
-           else:
-                audio_data=extract_15_seconds(segment.audio,segment.start_time,segment.end_time)
-                text_to_speech(segment_id,target_text,audio_data)
-                os.remove(audio_data)
+           text_to_speech(segment_id,target_text,segment.audio)
     construct_audio()
     return JSONResponse(status_code=200, content={"status_code": 200})
 
@@ -267,20 +267,10 @@ def get_all_audio_segments():
 
 
 
-def extract_15_seconds(audio_data, start_time, end_time):
-    audio_segment = AudioSegment.from_file(BytesIO(audio_data), format='wav')
-    start_ms = start_time * 1000  
-    end_ms = min((start_time + 15) * 1000, end_time * 1000)  
-    extracted_segment = audio_segment[start_ms:end_ms]
-    temp_wav_path = "temp.wav"
-    extracted_segment.export(temp_wav_path, format="wav")
-
-    return temp_wav_path
-
 
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
-    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio.wav"
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
     #all_segments = get_all_audio_segments()
     #print(all_segments)
     #split_audio_segments(audio_url)
