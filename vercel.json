@@ -6,9 +6,7 @@
         "use": "@vercel/python"
       }
     ],
-    "config": {
-      "python": "3.9"
-    },
+   
     "routes": [
       {
         "src": "/(.*)",
