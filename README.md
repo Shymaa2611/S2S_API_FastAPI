@@ -16,6 +16,7 @@
 
 ## Technologies
 - FASTAPI
+- sqlite database
 - Natural Language processing
 - Large Language Model
 - Speech Processing
