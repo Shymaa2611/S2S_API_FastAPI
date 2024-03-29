@@ -17,8 +17,17 @@
 ## Framework 
 - FASTAPI
 
+
+## Usage
+  git clone https://github.com/Shymaa2611/S2S_API_FastAPI.git
+  cd S2S_API_FastAPI
+  pip install -r requirements.txt
+  uvicorn main:app --reload
+
+
 ### Running
-  - http://127.0.0.1:8000 
+ 
+  - http://127.0.0.1:8000/docs
 
 ### Deploy
 

@@ -287,8 +287,8 @@ if __name__=="main":
     #file_path=get_audio(audio_url)
     #split_audio_segments(audio_url)
     #data=get_audio(audio_url)
-    construct_audio()
-    data=get_audio(audio_url)
+    #construct_audio()
+    #data=get_audio(audio_url)
     #all_segments = get_all_audio_segments()
 
     print("Done!")
