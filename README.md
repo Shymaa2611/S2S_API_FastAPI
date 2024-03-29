@@ -20,8 +20,11 @@
 
 ## Usage
   git clone https://github.com/Shymaa2611/S2S_API_FastAPI.git
+  <br><br>
   cd S2S_API_FastAPI
+  <br><br>
   pip install -r requirements.txt
+  <br><br>
   uvicorn main:app --reload
 
 
