@@ -101,10 +101,11 @@ def split_audio_segments(audio_url):
     # Process speech segments
     for i, speech_segment in enumerate(speech_segments):
         start = int(speech_segment['start'] * 1000)  
-        end = int(speech_segment['end'] * 1000)
-        create_segment(start_time=start/ 1000,
-            end_time=end / 1000,
-            type="speech",audio=segment)    
+        end = int(speech_segment['end'] * 1000)  
+        segment = sound[start:end]
+        create_segment(start_time=start/1000,
+            end_time=end/1000,
+            type="speech",audio=segment)
     # Process non-speech segments 
     for i, non_speech_segment in enumerate(non_speech_segment):
         start = int(non_speech_segment['start'] * 1000)  
