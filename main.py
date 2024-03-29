@@ -190,7 +190,7 @@ source  => english speech
 target  => arabic speeech
 """
 
-#@app.post("/speech2speech/")
+@app.post("/speech2speech/")
 def speech_to_speech_translation_en_ar(audio_url):
     session=Session()
     target_text=None
@@ -216,7 +216,7 @@ def speech_to_speech_translation_en_ar(audio_url):
                 text_to_speech(segment_id,target_text,audio_data)
                 os.remove(audio_data)
     construct_audio()
-    return JSONResponse(status_code=200, content={"status_code": 200})
+    return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
     
 
 
