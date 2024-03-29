@@ -219,8 +219,6 @@ def speech_to_speech_translation_en_ar(audio_url):
     return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
     
 
-
-
 @app.get("/get_target_audio/")
 def get_audio(audio_url):
     speech_to_speech_translation_en_ar(audio_url)

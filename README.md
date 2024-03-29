@@ -14,9 +14,14 @@
 
 ![S2ST](api_process_image.jpg)
 
+## Technologies
+- FASTAPI
+- Natural Language processing
+- Large Language Model
+- Speech Processing
+
 ## Framework 
 - FASTAPI
-
 
 ## Usage
   git clone https://github.com/Shymaa2611/S2S_API_FastAPI.git

@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from main import app,construct_audio,get_all_audio_segments,text_to_text_translation,speech_to_text_process,audio_speech_nonspeech_detection,get_audio,extract_15_seconds
 from unittest.mock import Mock
 client = TestClient(app)
+
 def test_create_segment():
     response = client.post("/create_segment/", json={"start_time": 0.0, "end_time": 1.0, "audio": "audio_data", "type": "speech"})
     assert response.status_code == 200
@@ -24,13 +25,11 @@ def test_speech_to_text_process():
     text = speech_to_text_process("audio_data")
     assert text is not None
 
-
 def test_speech_to_speech_translation_en_ar():
     audio_url = "audio_url"
     response = client.post("/speech2speech/", json={"audio_url": audio_url})
     assert response.status_code == 200
     assert response.json() == {"status_code":"succcessfully"}
-
 
 def test_construct_audio(mock_generate_target, mock_AudioSegment, mock_Session):
     session_instance = mock_Session.return_value
