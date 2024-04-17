@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from s2smodels import Base, Audio_segment, AudioGeneration
 from pydub import AudioSegment
 import os
+from fastapi import FastAPI, Response
 import torch
 from  googletrans import Translator
 from fastapi.responses import JSONResponse
@@ -117,15 +118,15 @@ def split_audio_segments(audio_url):
 
 @app.post("/translate/")
 def text_to_text_translation(text):
-    translator=Translator()
-    translate_text=translator.translate(text,dest='zh-CN',src='en')
-    return translate_text.text
+    pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
+    result=pipe(text,src_lang='English',tgt_lang='Egyptain Arabic')
+    return result[0]['translation_text']
 
 
 def make_prompt_audio(name,audio_path):
     make_prompt(name=name, audio_prompt_path=audio_path)
 
-# whisper model for speech to text process
+# whisper model for speech to text process (english language)
 @app.post("/speech_to_text/")   
 def speech_to_text_process(segment):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -220,26 +221,107 @@ def speech_to_speech_translation_en_ar(audio_url):
     return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
     
 
-@app.get("/get_target_audio/")
-def get_audio(audio_url):
+@app.get("/get_ar_target_audio/")
+async def get_audio(audio_url):
     speech_to_speech_translation_en_ar(audio_url)
     session = Session()
-    #get target audio from AudioGeneration
+    # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
-    #remove target audio from database
-    session.query(AudioGeneration).delete()
-    session.commit()
-    session.close()
-    if target_audio  is None:
+    # Remove target audio from database
+    #session.query(AudioGeneration).delete()
+    #session.commit()
+    #session.close()
+    if target_audio is None:
         raise ValueError("No audio found in the database")
-    audio_bytes = target_audio.audio
-    file_path = "target_audio.wav"
-    with open(file_path, "wb") as file:
-        file.write(audio_bytes)
-    session.close()
-    return {"audio_url":file_path}
-
     
+    audio_bytes = target_audio.audio
+    return Response(content=audio_bytes, media_type="audio/wav")
+
+
+# whisper model for speech to text process
+@app.post("/ar_speech_to_text/")   
+def ar_speech_to_text_process(segment):
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    model_id = "openai/whisper-large-v3"
+    model = AutoModelForSpeechSeq2Seq.from_pretrained(
+           model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True)
+    model.to(device)
+    processor = AutoProcessor.from_pretrained(model_id)
+    pipe = pipeline(
+     "automatic-speech-recognition",
+      model=model,
+      tokenizer=processor.tokenizer,
+      feature_extractor=processor.feature_extractor,
+      max_new_tokens=128,
+      chunk_length_s=30,
+      batch_size=16,
+      return_timestamps=True,
+      torch_dtype=torch_dtype,
+      device=device,
+    )
+    result = pipe(segment,generate_kwargs={"language": "arabic"})
+    return result["text"]
+
+@app.post("/ar_translate/")
+def ar_text_to_en_text_translation(text):
+    pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
+    result=pipe(text,src_lang='Egyptain Arabic',tgt_lang='English')
+    return result[0]['translation_text']
+
+
+"""
+source  => english speech
+target  => arabic speeech
+"""
+
+@app.post("/speech2speech_ar_en/")
+def speech_to_speech_translation_ar_en(audio_url):
+    session=Session()
+    target_text=None
+    split_audio_segments(audio_url)
+    #filtering by type
+    speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
+    for segment in speech_segments:
+        audio_data = segment.audio
+        text = ar_speech_to_text_process(audio_data)
+        if text:
+            target_text=ar_text_to_en_text_translation(text)
+        else:
+            print("speech_to_text_process function not return result. ")
+        if target_text is None:
+            print("Target text is None.")
+        else:
+           segment_id = segment.id
+           segment_duration = segment.end_time - segment.start_time
+           if segment_duration <=15:
+                text_to_speech(segment_id,target_text,segment.audio)
+           else:
+                audio_data=extract_15_seconds(segment.audio,segment.start_time,segment.end_time)
+                text_to_speech(segment_id,target_text,audio_data)
+                os.remove(audio_data)
+    construct_audio()
+    return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
+    
+
+@app.get("/get_en_target_audio/")
+async def get_audio_en(audio_url):
+    speech_to_speech_translation_ar_en(audio_url)
+    session = Session()
+    # Get target audio from AudioGeneration
+    target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
+    # Remove target audio from database
+    #session.query(AudioGeneration).delete()
+    #session.commit()
+    #session.close()
+    if target_audio is None:
+        raise ValueError("No audio found in the database")
+    
+    audio_bytes = target_audio.audio
+    return Response(content=audio_bytes, media_type="audio/wav")
+
+
+
 @app.get("/audio_segments/")
 def get_all_audio_segments():
         session=Session()
@@ -276,7 +358,7 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
 if __name__=="main":
     #speech_to_speech_translation_en_ar(audio_url)
-    audio_url="D:\\MachineCourse\\English in a Minute- Party Animal.wav"
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
     #all_segments = get_all_audio_segments()
     #print(all_segments)
     #split_audio_segments(audio_url)
@@ -284,11 +366,13 @@ if __name__=="main":
     #construct_audio()
     #data=get_audio(audio_url)
     #file_path=get_audio(audio_url)
-    #split_audio_segments(audio_url)
+    split_audio_segments(audio_url)
     #data=get_audio(audio_url)
-    #construct_audio()
+    construct_audio()
     #data=get_audio(audio_url)
     #all_segments = get_all_audio_segments()
+    #construct_audio()
+    #get_audio(audio_url)
 
     print("Done!")
     
