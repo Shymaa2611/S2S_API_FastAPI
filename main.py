@@ -6,13 +6,11 @@ from pydub import AudioSegment
 import os
 from fastapi import FastAPI, Response
 import torch
-from  googletrans import Translator
 from fastapi.responses import JSONResponse
 from utils.prompt_making import make_prompt
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 from utils.generation import SAMPLE_RATE, generate_audio, preload_models
 from scipy.io.wavfile import write as write_wav
-import shutil
 from io import BytesIO
 from pyannote.audio import Pipeline
 import soundfile as sf
