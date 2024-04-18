@@ -19,7 +19,7 @@ engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
 app = FastAPI()
-""" origins = ["*"]
+origins = ["*"]
 
 app.add_middleware(
     CORS,
@@ -28,7 +28,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
- """
+ 
 Base.metadata.create_all(engine)
 
 
@@ -125,7 +125,7 @@ def make_prompt_audio(name,audio_path):
 
 # whisper model for speech to text process (english language)
 #@app.post("/en_speech_ar_text/")   
-def en_speech_to_ar_text_process(segment):
+def en_speech_to_en_text_process(segment):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -198,7 +198,7 @@ def speech_to_speech_translation_en_ar(audio_url):
     speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
     for segment in speech_segments:
         audio_data = segment.audio
-        text = en_speech_to_ar_text_process(audio_data)
+        text = en_speech_to_en_text_process(audio_data)
         if text:
             target_text=en_text_to_ar_text_translation(text)
         else:
@@ -219,7 +219,7 @@ def speech_to_speech_translation_en_ar(audio_url):
     
 
 @app.get("/get_ar_audio/")
-async def get_audio(audio_url):
+async def get_ar_audio(audio_url):
     speech_to_speech_translation_en_ar(audio_url)
     session = Session()
     # Get target audio from AudioGeneration
@@ -238,7 +238,7 @@ async def get_audio(audio_url):
 # speech to speech from arabic to english  processes
 
 #@app.post("/ar_speech_to_en_text/")   
-def ar_speech_to_en_text_process(segment):
+def ar_speech_to_ar_text_process(segment):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -269,8 +269,8 @@ def ar_text_to_en_text_translation(text):
 
 
 """
-source  => english speech
-target  => arabic speeech
+source  => arabic speech
+target  => english speeech
 """
 def speech_to_speech_translation_ar_en(audio_url):
     session=Session()
@@ -280,7 +280,7 @@ def speech_to_speech_translation_ar_en(audio_url):
     speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
     for segment in speech_segments:
         audio_data = segment.audio
-        text = ar_speech_to_en_text_process(audio_data)
+        text = ar_speech_to_ar_text_process(audio_data)
         if text:
             target_text=ar_text_to_en_text_translation(text)
         else:
@@ -301,7 +301,7 @@ def speech_to_speech_translation_ar_en(audio_url):
     
 
 @app.get("/get_en_audio/")
-async def get_audio_en(audio_url):
+async def get_en_audio(audio_url):
     speech_to_speech_translation_ar_en(audio_url)
     session = Session()
     # Get target audio from AudioGeneration
@@ -352,24 +352,6 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
     return temp_wav_path
 
-if __name__=="main":
-    #speech_to_speech_translation_en_ar(audio_url)
-    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
-    #all_segments = get_all_audio_segments()
-    #print(all_segments)
-    #split_audio_segments(audio_url)
-    #first_Audio=get_first2_audio()
-    #construct_audio()
-    #data=get_audio(audio_url)
-    #file_path=get_audio(audio_url)
-    #split_audio_segments(audio_url)
-    #data=get_audio(audio_url)
-    #construct_audio()
-    #data=get_audio(audio_url)
-    #all_segments = get_all_audio_segments()
-    #construct_audio()
-    #get_audio(audio_url)
 
-    print("Done!")
     
    
