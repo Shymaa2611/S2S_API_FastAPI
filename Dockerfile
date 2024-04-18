@@ -8,7 +8,6 @@ COPY ./utils/ . /code/
 COPY ./modules/ . /code/ 
 COPY ./models/ . /code/ 
 COPY ./data/ . /code/
-COPY ./whisper /code/
 COPY ./prompts/ . /code/ 
 COPY ./customs/ . /code/ 
 COPY ./main.py /code/ 
