@@ -31,3 +31,6 @@ fastapi
 uvicorn[standard]
 pytest
 fastapi-cors
+sqlalchemy
+sqlalchemy.orm
+io

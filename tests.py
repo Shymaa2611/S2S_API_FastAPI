@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app,construct_audio,get_all_audio_segments,text_to_text_translation,speech_to_text_process,audio_speech_nonspeech_detection,get_audio,extract_15_seconds
+from main import *
 from unittest.mock import Mock
 
 client = TestClient(app)
@@ -19,11 +19,11 @@ def test_audio_speech_nonspeech_detection():
     assert len(non_speech_segments) > 0
 
 def test_text_to_text_translation():
-    translated_text = text_to_text_translation("english_text")
+    translated_text = en_text_to_ar_text_translation("english_text")
     assert translated_text is not None
 
 def test_speech_to_text_process():
-    text = speech_to_text_process("audio_data")
+    text = en_speech_to_ar_text_process("audio_data")
     assert text is not None
 
 def test_speech_to_speech_translation_en_ar():
