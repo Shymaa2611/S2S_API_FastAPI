@@ -221,7 +221,7 @@ def speech_to_speech_translation_en_ar(audio_url):
 
 @app.get("/get_ar_audio/")
 async def get_ar_audio(audio_url):
-    speech_to_speech_translation_en_ar(audio_url)
+    #speech_to_speech_translation_en_ar(audio_url)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
