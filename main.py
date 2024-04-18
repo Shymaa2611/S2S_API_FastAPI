@@ -19,7 +19,7 @@ engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
 app = FastAPI()
- 
+
 origins = ["*"]
 
 app.add_middleware(
@@ -354,5 +354,7 @@ def extract_15_seconds(audio_data, start_time, end_time):
     return temp_wav_path
 
 
+
+ 
     
    
