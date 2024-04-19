@@ -353,5 +353,4 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
     return temp_wav_path
 
-    
    
