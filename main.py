@@ -19,7 +19,7 @@ engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
 app = FastAPI()
-
+""" 
 origins = ["*"]
 
 app.add_middleware(
@@ -29,7 +29,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+"""
 Base.metadata.create_all(engine)
 
 
@@ -221,7 +221,7 @@ def speech_to_speech_translation_en_ar(audio_url):
 
 @app.get("/get_ar_audio/")
 async def get_ar_audio(audio_url):
-    #speech_to_speech_translation_en_ar(audio_url)
+    speech_to_speech_translation_en_ar(audio_url)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
@@ -353,5 +353,5 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
     return temp_wav_path
 
-
+    
    
