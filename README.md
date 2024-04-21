@@ -20,6 +20,7 @@
 - Natural Language processing
 - Large Language Model
 - Speech Processing
+- Docker
 
 ## Framework 
 - FASTAPI

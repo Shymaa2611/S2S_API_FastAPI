@@ -63,6 +63,7 @@ def generate_target(audio: AudioSegment):
     session.close()
 
     return {"status_code": 200, "message": "success"}
+
 """
 audio segmentation into speech and non-speech using segmentation model
 """
@@ -221,7 +222,7 @@ def speech_to_speech_translation_en_ar(audio_url):
 
 @app.get("/get_ar_audio/")
 async def get_ar_audio(audio_url):
-    speech_to_speech_translation_en_ar(audio_url)
+    #speech_to_speech_translation_en_ar(audio_url)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
@@ -353,4 +354,24 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
     return temp_wav_path
 
+if __name__=="main":
+    #speech_to_speech_translation_en_ar(audio_url)
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
+    #all_segments = get_all_audio_segments()
+    #print(all_segments)
+    #split_audio_segments(audio_url)
+    #first_Audio=get_first2_audio()
+    #construct_audio()
+    #data=get_audio(audio_url)
+    #file_path=get_audio(audio_url)
+    #split_audio_segments(audio_url)
+    #data=get_audio(audio_url)
+    #construct_audio()
+    #data=get_audio(audio_url)
+    #all_segments = get_all_audio_segments()
+    #construct_audio()
+    #get_audio(audio_url)
+
+    print("Done!")
+    
    
