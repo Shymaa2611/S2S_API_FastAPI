@@ -118,7 +118,7 @@ def split_audio_segments(audio_url):
 @app.post("/translate_en_ar/")
 def en_text_to_ar_text_translation(text):
     pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
-    result=pipe(text,src_lang='English',tgt_lang='Egyptain Arabic')
+    result=pipe(text,src_lang="eng_Latn",tgt_lang="arz_Arab")
     return result[0]['translation_text']
 
 
@@ -222,7 +222,7 @@ def speech_to_speech_translation_en_ar(audio_url):
 
 @app.get("/get_ar_audio/")
 async def get_ar_audio(audio_url):
-    speech_to_speech_translation_en_ar(audio_url)
+    #speech_to_speech_translation_en_ar(audio_url)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
@@ -266,7 +266,7 @@ def ar_speech_to_ar_text_process(segment):
 #@app.post("/ar_translate/")
 def ar_text_to_en_text_translation(text):
     pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
-    result=pipe(text,src_lang='Egyptain Arabic',tgt_lang='English')
+    result=pipe(text,ssrc_lang="arz_Arab",tgt_lang="eng_Latn")
     return result[0]['translation_text']
 
 
@@ -369,8 +369,8 @@ if __name__=="main":
     #construct_audio()
     #data=get_audio(audio_url)
     #all_segments = get_all_audio_segments()
-    #construct_audio()
-    #get_audio(audio_url)
+    construct_audio()
+    #get_ar_audio(audio_url)
 
     print("Done!")
     
