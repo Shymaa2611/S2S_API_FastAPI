@@ -9,7 +9,7 @@
 ### AI Models
 - segmentation model 
 - automatic speech recognition (Whisper)
-- machine translation (Google translation)
+- machine translation (facebook/nllb-200-distilled-600M)
 - text to speech (VALL-E-X)
 
 ![S2ST](api_process_image.jpg)

@@ -6,7 +6,7 @@ from unittest.mock import Mock
 client = TestClient(app)
 
 def test_create_segment():
-    response = client.post("/create_segment/", json={"start_time": 0.0, "end_time": 1.0, "audio": "audio_data", "type": "speech"})
+    response = create_segment(0.0,0.0, 'segment', 'speech')
     assert response.status_code == 200
     
 def test_generate_target():
