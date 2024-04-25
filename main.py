@@ -115,7 +115,7 @@ def split_audio_segments(audio_url):
             end_time=end/1000,
             type="non-speech",audio=segment)
 
-#@app.post("/translate_en_ar/")
+@app.post("/translate_en_ar/")
 def en_text_to_ar_text_translation(text):
     pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
     result=pipe(text,src_lang='English',tgt_lang='Egyptain Arabic')
@@ -220,19 +220,22 @@ def speech_to_speech_translation_en_ar(audio_url):
     return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
     
 
-@app.get("/get_target_audio/")
-def get_ar_audio(audio_url):
+@app.get("/get_ar_audio/")
+async def get_ar_audio(audio_url):
     speech_to_speech_translation_en_ar(audio_url)
     session = Session()
-    target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id).first()
-    if target_audio  is None:
+    # Get target audio from AudioGeneration
+    target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
+    # Remove target audio from database
+    #session.query(AudioGeneration).delete()
+    #session.commit()
+    #session.close()
+    if target_audio is None:
         raise ValueError("No audio found in the database")
+    
     audio_bytes = target_audio.audio
-    file_path = "target_audio.wav"
-    with open(file_path, "wb") as file:
-        file.write(audio_bytes)
-    session.close()
-    return {"audio_url":file_path}
+    return Response(content=audio_bytes, media_type="audio/wav")
+
 
 # speech to speech from arabic to english  processes
 
@@ -367,7 +370,7 @@ if __name__=="main":
     #data=get_audio(audio_url)
     #all_segments = get_all_audio_segments()
     #construct_audio()
-    get_ar_audio(audio_url)
+    #get_audio(audio_url)
 
     print("Done!")
     
