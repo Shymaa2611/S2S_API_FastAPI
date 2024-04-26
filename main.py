@@ -115,7 +115,7 @@ def split_audio_segments(audio_url):
             type="non-speech",audio=segment)
 
 
-def detect_language(source_language,target_language):
+def detect_language(source_language:str,target_language:str):
     if source_language=="english":
            source_language="eng_Latn"
            if target_language=="chinese":
@@ -128,7 +128,7 @@ def detect_language(source_language,target_language):
     return source_language,target_language
 
 #@app.post("/translate/")
-def text_translation(text,source_language,target_language):
+def text_translation(text,source_language:str,target_language:str):
     source_language,target_language=detect_language(source_language,target_language)
     pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
     result=pipe(text,src_lang=source_language,tgt_lang=target_language)
@@ -140,7 +140,7 @@ def make_prompt_audio(name,audio_path):
 
 # whisper model for speech to text process (english language)
 #@app.post("/speech_text/")   
-def speech_to_text_process(segment,source_language):
+def speech_to_text_process(segment,source_language:str):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -205,7 +205,7 @@ target  => arabic speeech
 """
 
 #@app.post("/speech_translation/")
-def speech_to_speech_translation(audio_url,source_language,target_language):
+def speech_to_speech_translation(audio_url,source_language:str,target_language:str):
     session=Session()
     target_text=None
     split_audio_segments(audio_url)
@@ -283,3 +283,6 @@ def extract_15_seconds(audio_data, start_time, end_time):
     extracted_segment.export(temp_wav_path, format="wav")
 
     return temp_wav_path
+
+
+   
