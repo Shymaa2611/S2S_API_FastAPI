@@ -118,7 +118,10 @@ def split_audio_segments(audio_url):
 def detect_language(source_language,target_language):
     if source_language=="english":
            source_language="eng_Latn"
-           target_language="arz_Arab"
+           if target_language=="chinese":
+                target_language="zho_Hant"
+           else:
+               target_language="arz_Arab"
     else:
             source_language="arz_Arab"
             target_language="eng_Latn"
@@ -232,7 +235,7 @@ def speech_to_speech_translation(audio_url,source_language,target_language):
 
 @app.get("/get_audio/")
 async def get_audio(audio_url,source_language,target_language):
-    speech_to_speech_translation(audio_url,source_language,target_language)
+    #speech_to_speech_translation(audio_url,source_language,target_language)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
@@ -281,6 +284,24 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
     return temp_wav_path
 
+if __name__=="main":
+    #speech_to_speech_translation_en_ar(audio_url)
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
+    #all_segments = get_all_audio_segments()
+    #print(all_segments)
+    #split_audio_segments(audio_url)
+    #first_Audio=get_first2_audio()
+    #construct_audio()
+    #data=get_audio(audio_url)
+    #file_path=get_audio(audio_url)
+    #split_audio_segments(audio_url)
+    #data=get_audio(audio_url)
+    #construct_audio()
+    #data=get_audio(audio_url,source_language="english",target_language="arabic")
+    #all_segments = get_all_audio_segments()
 
+    #get_ar_audio(audio_url)
+
+    print("Done!")
     
    
