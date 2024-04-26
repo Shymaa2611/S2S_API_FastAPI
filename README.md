@@ -39,6 +39,14 @@
  
   - http://127.0.0.1:8000/docs
 
+
+
+### Docker
+ 
+  - docker build -t S2SImage .
+  - docker run -d --name S2Scontainer -p 80:80 S2SImage
+
+
 ### Deploy
 
   
