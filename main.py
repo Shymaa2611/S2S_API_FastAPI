@@ -32,7 +32,6 @@ app.add_middleware(
 """
 Base.metadata.create_all(engine)
 
-
 @app.get("/")
 def root():
     return {"message": "No result"}
@@ -115,10 +114,21 @@ def split_audio_segments(audio_url):
             end_time=end/1000,
             type="non-speech",audio=segment)
 
-@app.post("/translate_en_ar/")
-def en_text_to_ar_text_translation(text):
+
+def detect_language(source_language,target_language):
+    if source_language=="english":
+           source_language="eng_Latn"
+           target_language="arz_Arab"
+    else:
+            source_language="arz_Arab"
+            target_language="eng_Latn"
+    return source_language,target_language
+
+#@app.post("/translate/")
+def text_translation(text,source_language,target_language):
+    source_language,target_language=detect_language(source_language,target_language)
     pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
-    result=pipe(text,src_lang="eng_Latn",tgt_lang="arz_Arab")
+    result=pipe(text,src_lang=source_language,tgt_lang=target_language)
     return result[0]['translation_text']
 
 
@@ -126,8 +136,8 @@ def make_prompt_audio(name,audio_path):
     make_prompt(name=name, audio_prompt_path=audio_path)
 
 # whisper model for speech to text process (english language)
-#@app.post("/en_speech_ar_text/")   
-def en_speech_to_en_text_process(segment):
+#@app.post("/speech_text/")   
+def speech_to_text_process(segment,source_language):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -147,7 +157,7 @@ def en_speech_to_en_text_process(segment):
       torch_dtype=torch_dtype,
       device=device,
     )
-    result = pipe(segment)
+    result = pipe(segment,generate_kwargs={"language":source_language})
     return result["text"]
 
 #text to speech using VALL-E-X model 
@@ -191,8 +201,8 @@ source  => english speech
 target  => arabic speeech
 """
 
-#@app.post("/en_speech_ar_speech/")
-def speech_to_speech_translation_en_ar(audio_url):
+#@app.post("/speech_translation/")
+def speech_to_speech_translation(audio_url,source_language,target_language):
     session=Session()
     target_text=None
     split_audio_segments(audio_url)
@@ -200,9 +210,9 @@ def speech_to_speech_translation_en_ar(audio_url):
     speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
     for segment in speech_segments:
         audio_data = segment.audio
-        text = en_speech_to_en_text_process(audio_data)
+        text = speech_to_text_process(audio_data,source_language)
         if text:
-            target_text=en_text_to_ar_text_translation(text)
+            target_text=text_translation(text,source_language,target_language)
         else:
             print("speech_to_text_process function not return result. ")
         if target_text is None:
@@ -220,9 +230,9 @@ def speech_to_speech_translation_en_ar(audio_url):
     return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
     
 
-@app.get("/get_ar_audio/")
-async def get_ar_audio(audio_url):
-    #speech_to_speech_translation_en_ar(audio_url)
+@app.get("/get_audio/")
+async def get_audio(audio_url,source_language,target_language):
+    speech_to_speech_translation(audio_url,source_language,target_language)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
@@ -235,89 +245,6 @@ async def get_ar_audio(audio_url):
     
     audio_bytes = target_audio.audio
     return Response(content=audio_bytes, media_type="audio/wav")
-
-
-# speech to speech from arabic to english  processes
-
-#@app.post("/ar_speech_to_en_text/")   
-def ar_speech_to_ar_text_process(segment):
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-    model_id = "openai/whisper-large-v3"
-    model = AutoModelForSpeechSeq2Seq.from_pretrained(
-           model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True)
-    model.to(device)
-    processor = AutoProcessor.from_pretrained(model_id)
-    pipe = pipeline(
-     "automatic-speech-recognition",
-      model=model,
-      tokenizer=processor.tokenizer,
-      feature_extractor=processor.feature_extractor,
-      max_new_tokens=128,
-      chunk_length_s=30,
-      batch_size=16,
-      return_timestamps=True,
-      torch_dtype=torch_dtype,
-      device=device,
-    )
-    result = pipe(segment,generate_kwargs={"language": "arabic"})
-    return result["text"]
-
-#@app.post("/ar_translate/")
-def ar_text_to_en_text_translation(text):
-    pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
-    result=pipe(text,ssrc_lang="arz_Arab",tgt_lang="eng_Latn")
-    return result[0]['translation_text']
-
-
-"""
-source  => arabic speech
-target  => english speeech
-"""
-def speech_to_speech_translation_ar_en(audio_url):
-    session=Session()
-    target_text=None
-    split_audio_segments(audio_url)
-    #filtering by type
-    speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
-    for segment in speech_segments:
-        audio_data = segment.audio
-        text = ar_speech_to_ar_text_process(audio_data)
-        if text:
-            target_text=ar_text_to_en_text_translation(text)
-        else:
-            print("speech_to_text_process function not return result. ")
-        if target_text is None:
-            print("Target text is None.")
-        else:
-           segment_id = segment.id
-           segment_duration = segment.end_time - segment.start_time
-           if segment_duration <=15:
-                text_to_speech(segment_id,target_text,segment.audio)
-           else:
-                audio_data=extract_15_seconds(segment.audio,segment.start_time,segment.end_time)
-                text_to_speech(segment_id,target_text,audio_data)
-                os.remove(audio_data)
-    construct_audio()
-    return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
-    
-
-@app.get("/get_en_audio/")
-async def get_en_audio(audio_url):
-    speech_to_speech_translation_ar_en(audio_url)
-    session = Session()
-    # Get target audio from AudioGeneration
-    target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
-    # Remove target audio from database
-    #session.query(AudioGeneration).delete()
-    #session.commit()
-    #session.close()
-    if target_audio is None:
-        raise ValueError("No audio found in the database")
-    
-    audio_bytes = target_audio.audio
-    return Response(content=audio_bytes, media_type="audio/wav")
-
 
 
 @app.get("/audio_segments/")
@@ -354,24 +281,6 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
     return temp_wav_path
 
-if __name__=="main":
-    #speech_to_speech_translation_en_ar(audio_url)
-    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
-    #all_segments = get_all_audio_segments()
-    #print(all_segments)
-    #split_audio_segments(audio_url)
-    #first_Audio=get_first2_audio()
-    #construct_audio()
-    #data=get_audio(audio_url)
-    #file_path=get_audio(audio_url)
-    #split_audio_segments(audio_url)
-    #data=get_audio(audio_url)
-    #construct_audio()
-    #data=get_audio(audio_url)
-    #all_segments = get_all_audio_segments()
-    construct_audio()
-    #get_ar_audio(audio_url)
 
-    print("Done!")
     
    
