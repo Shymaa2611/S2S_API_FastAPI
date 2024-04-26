@@ -43,8 +43,8 @@
 
 ### Docker
  
-  - docker build -t S2SImage .
-  - docker run -d --name S2Scontainer -p 80:80 S2SImage
+  - docker build -t s2simage .
+  - docker run -d --name s2scontainer -p 80:80 s2simage
 
 
 ### Deploy
