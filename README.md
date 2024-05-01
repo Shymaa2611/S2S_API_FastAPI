@@ -7,9 +7,9 @@
    convert spoken words into text, machine translation (MT) to translate the text, and text-to-speech (TTS) synthesis to convert the translated text back into  speech. 
 
 ### AI Models
-- segmentation model 
+- segmentation model (V-segment)
 - automatic speech recognition (Whisper)
-- machine translation (facebook/nllb-200-distilled-600M)
+- machine translation (No Language Left Behind)
 - text to speech (VALL-E-X)
 
 ![S2ST](api_process_image.jpg)
@@ -43,8 +43,8 @@
 
 ### Docker
  
-  - docker build -t S2SImage .
-  - docker run -d --name S2Scontainer -p 80:80 S2SImage
+  - docker build -t s2simage .
+  - docker run -d --name s2scontainer -p 80:80 s2simage
 
 
 ### Deploy

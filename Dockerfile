@@ -1,10 +1,9 @@
 FROM python:3.11
 WORKDIR /code
-RUN mkdir -p /.cache && chmod 777 /.cache
-RUN mkdir -p ./whisper/ && chmod 777 ./whisper/
 COPY ./requirements.txt /code/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+RUN pip install  -r /code/requirements.txt
 COPY ./s2smodels.py /code/
+COPY ./whisper /code/
 COPY ./macros.py /code/
 COPY ./sql_app.db /code/
 COPY ./utils /code/utils/
