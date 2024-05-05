@@ -36,6 +36,33 @@ Base.metadata.create_all(engine)
 def root():
     return {"message": "No result"}
 
+
+def load_whisperModel():
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    model_id = "openai/whisper-large-v3"
+    model = AutoModelForSpeechSeq2Seq.from_pretrained(
+           model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True)
+    model.to(device)
+    processor = AutoProcessor.from_pretrained(model_id)
+    pipe = pipeline(
+     "automatic-speech-recognition",
+      model=model,
+      tokenizer=processor.tokenizer,
+      feature_extractor=processor.feature_extractor,
+      max_new_tokens=128,
+      chunk_length_s=30,
+      batch_size=16,
+      return_timestamps=True,
+      torch_dtype=torch_dtype,
+      device=device,
+    )
+    return pipe
+
+def load_translationModel():
+    pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
+    return pipe
+
 #add audio segements in Audio_segment Table
 def create_segment(start_time: float, end_time: float, audio: AudioSegment, type: str):
     session = Session()
@@ -128,9 +155,8 @@ def detect_language(source_language:str,target_language:str):
     return source_language,target_language
 
 #@app.post("/translate/")
-def text_translation(text,source_language:str,target_language:str):
+def text_translation(pipe,text,source_language:str,target_language:str):
     source_language,target_language=detect_language(source_language,target_language)
-    pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
     result=pipe(text,src_lang=source_language,tgt_lang=target_language)
     return result[0]['translation_text']
 
@@ -140,26 +166,8 @@ def make_prompt_audio(name,audio_path):
 
 # whisper model for speech to text process (english language)
 #@app.post("/speech_text/")   
-def speech_to_text_process(segment,source_language:str):
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-    model_id = "openai/whisper-large-v3"
-    model = AutoModelForSpeechSeq2Seq.from_pretrained(
-           model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True)
-    model.to(device)
-    processor = AutoProcessor.from_pretrained(model_id)
-    pipe = pipeline(
-     "automatic-speech-recognition",
-      model=model,
-      tokenizer=processor.tokenizer,
-      feature_extractor=processor.feature_extractor,
-      max_new_tokens=128,
-      chunk_length_s=30,
-      batch_size=16,
-      return_timestamps=True,
-      torch_dtype=torch_dtype,
-      device=device,
-    )
+def speech_to_text_process(pipe,segment,source_language:str):
+    
     result = pipe(segment,generate_kwargs={"language":source_language})
     return result["text"]
 
@@ -206,6 +214,8 @@ target  => arabic speeech
 
 #@app.post("/speech_translation/")
 def speech_to_speech_translation(audio_url,source_language:str,target_language:str):
+    pipe=load_whisperModel()
+    pipe2=load_translationModel()
     session=Session()
     target_text=None
     split_audio_segments(audio_url)
@@ -213,9 +223,9 @@ def speech_to_speech_translation(audio_url,source_language:str,target_language:s
     speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
     for segment in speech_segments:
         audio_data = segment.audio
-        text = speech_to_text_process(audio_data,source_language)
+        text = speech_to_text_process(pipe,audio_data,source_language)
         if text:
-            target_text=text_translation(text,source_language,target_language)
+            target_text=text_translation(pipe2,text,source_language,target_language)
         else:
             print("speech_to_text_process function not return result. ")
         if target_text is None:
