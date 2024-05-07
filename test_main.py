@@ -22,7 +22,7 @@ def test_create_segment(test_db):
     response = create_segment(start_time, end_time, audio, type)
     assert response == {"status_code": 200, "message": "success"}
     created_segment = test_db.query(Audio_segment).filter_by(start_time=start_time, end_time=end_time, type=type).first()
-    assert created_segment is None
+    assert created_segment is not None
     #assert created_segment.start_time 
     #assert created_segment.end_time == end_time
     #assert created_segment.type == type
