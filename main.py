@@ -50,7 +50,6 @@ def create_segment(start_time: float, end_time: float, audio: AudioSegment, type
 
     return {"status_code": 200, "message": "success"}
 
-
 #add target audio to AudioGeneration Table
 def generate_target(audio: AudioSegment):
     session = Session() 
@@ -64,13 +63,19 @@ def generate_target(audio: AudioSegment):
 
     return {"status_code": 200, "message": "success"}
 
+@lru_cache(maxsize=None)
+def load_segmentation_model():
+    pipeline = Pipeline.from_pretrained(
+     "pyannote/speaker-diarization-3.0",
+    use_auth_token="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")
+    return pipeline
+
+
 """
 audio segmentation into speech and non-speech using segmentation model
 """
 def audio_speech_nonspeech_detection(audio_url):
-    pipeline = Pipeline.from_pretrained(
-     "pyannote/speaker-diarization-3.0",
-    use_auth_token="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")
+    pipeline=load_segmentation_model()
     diarization = pipeline(audio_url)
     speaker_regions=[]
     for turn, _,speaker in  diarization.itertracks(yield_label=True):
@@ -294,3 +299,5 @@ def extract_15_seconds(audio_data, start_time, end_time):
 
     return temp_wav_path
 
+if __name__=='__main__':
+   construct_audio()
