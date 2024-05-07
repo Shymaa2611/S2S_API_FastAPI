@@ -14,6 +14,7 @@ from io import BytesIO
 from pyannote.audio import Pipeline
 import soundfile as sf
 from fastapi_cors import CORS
+from functools import lru_cache
 DATABASE_URL = "sqlite:///./sql_app.db"
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
@@ -127,10 +128,14 @@ def detect_language(source_language:str,target_language:str):
             target_language="eng_Latn"
     return source_language,target_language
 
+@lru_cache(maxsize=None)
+def load_NLLB_model():
+   pipe_trans = pipeline("translation", model="facebook/nllb-200-distilled-600M")
+   return pipe_trans
 #@app.post("/translate/")
 def text_translation(text,source_language:str,target_language:str):
     source_language,target_language=detect_language(source_language,target_language)
-    pipe = pipeline("translation", model="facebook/nllb-200-distilled-600M")
+    pipe=load_NLLB_model()
     result=pipe(text,src_lang=source_language,tgt_lang=target_language)
     return result[0]['translation_text']
 
@@ -138,9 +143,8 @@ def text_translation(text,source_language:str,target_language:str):
 def make_prompt_audio(name,audio_path):
     make_prompt(name=name, audio_prompt_path=audio_path)
 
-# whisper model for speech to text process (english language)
-#@app.post("/speech_text/")   
-def speech_to_text_process(segment,source_language:str):
+@lru_cache(maxsize=None)
+def load_whisper_model():
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -160,6 +164,12 @@ def speech_to_text_process(segment,source_language:str):
       torch_dtype=torch_dtype,
       device=device,
     )
+    return pipe
+     
+# whisper model for speech to text process (english language)
+#@app.post("/speech_text/")   
+def speech_to_text_process(segment,source_language:str):
+    pipe=load_whisper_model()
     result = pipe(segment,generate_kwargs={"language":source_language})
     return result["text"]
 
