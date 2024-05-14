@@ -329,29 +329,6 @@ async def get_audio(audio_url,source_language,target_language):
     audio_bytes = target_audio.audio
     return Response(content=audio_bytes, media_type="audio/wav")
 
-@app.get("/audio_segments/")
-def get_all_audio_segments():
-        session=Session()
-        segments = session.query(Audio_segment).all()
-        segment_dicts = []
-        for segment in segments:
-            if segment.audio is None:
-                raise ValueError("No audio found in the database")
-
-            audio_bytes = segment.audio
-            file_path = f"segments//segment{segment.id}_audio.wav"
-            with open(file_path, "wb") as file:
-               file.write(audio_bytes)
-            segment_dicts.append({
-                "id": segment.id,
-                "start_time": segment.start_time,
-                "end_time": segment.end_time,
-                "type": segment.type,
-                "audio_url":file_path
-            })
-        session.close()
-        return {"segments":segment_dicts}
-
 @app.get('/get_translated_text/')
 async def speech_to_text_translation(audio_url:str,source_language:str,target_language:str):
     speech2texttranslation_obj=SpeechToTextTranslation()
@@ -384,6 +361,27 @@ async def text_to_speech(text:str,audio_url:str):
     audio_bytes = target_audio.audio
     return Response(content=audio_bytes, media_type="audio/wav")
 
+@app.get("/audio_segments/")
+async def get_all_audio_segments():
+        session=Session()
+        segments = session.query(Audio_segment).all()
+        segment_dicts = []
+        for segment in segments:
+            if segment.audio is None:
+                raise ValueError("No audio found in the database")
+
+            audio_bytes = segment.audio
+            file_path = f"segments//segment{segment.id}_audio.wav"
+            with open(file_path, "wb") as file:
+               file.write(audio_bytes)
+            segment_dicts.append({
+                "id": segment.id,
+                "start_time": segment.start_time,
+                "end_time": segment.end_time,
+                "type": segment.type,
+                "audio_url":file_path
+            })
+        session.close()
+        return {"segments":segment_dicts}
 
 
-	
