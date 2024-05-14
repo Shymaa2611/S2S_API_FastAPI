@@ -15,7 +15,6 @@ from pyannote.audio import Pipeline
 import soundfile as sf
 from fastapi_cors import CORS
 import torchaudio
-from transformers import AutoProcessor, SeamlessM4Tv2Model
 from functools import lru_cache
 DATABASE_URL = "sqlite:///./sql_app.db"
 engine = create_engine(DATABASE_URL)
@@ -237,13 +236,12 @@ class TextToSpeech:
         audio_array = generate_audio(chunk, prompt="person")
         temp_file_path = "temp.wav"
         sf.write(temp_file_path, audio_array, SAMPLE_RATE, format='wav')
-        with open(temp_file_path, "rb") as file:
-            audio_bytes = file.read()
+        sound = AudioSegment.from_wav(temp_file_path)
         
         self.audioUtility_obj.create_segment(start_time=0.0,
                                              end_time=0.0,
                                              type=None,
-                                             audio=audio_bytes)
+                                             audio=sound)
         os.remove(temp_file_path)
     session.close()
 
@@ -297,43 +295,18 @@ class SpeechToSpeechTranslation:
                 self.text2tspeech_obj.text_to_speech_process(segment_id,target_text,audio_data)
                 os.remove(audio_data)
     self.audioUtility_obj.construct_audio()
-    
+
 class SpeechToTextTranslation:
-  def __init__(self):
-       self.audioutility=AudioUtility()
-  
-  @lru_cache(maxsize=None)
-  def load_seamless_model(self):
-   processor = AutoProcessor.from_pretrained("facebook/seamless-m4t-v2-large")
-   model = SeamlessM4Tv2Model.from_pretrained("facebook/seamless-m4t-v2-large")
-   return processor,model
-  
-  def detect_target_language(self,target_language):
-     if target_language=="english":
-        target_language="eng"
-     elif target_language=="arabic":
-        target_language="arz"
-     elif target_language=="chinese":
-        target_language="cmn"
-     return target_language
-           
-  def speech_to_text_translation(self, audio_url: str, target_language: str):
-        processor,model=self.load_seamless_model()
-        translated_text = ""
-        target_language = self.detect_target_language(target_language)
-        audio = AudioSegment.from_file(audio_url)
-        segment_length_ms = 5000
-        for i in range(0, len(audio), segment_length_ms):
-            segment = audio[i:i + segment_length_ms]
-            audio_bytes = BytesIO()
-            segment.export(audio_bytes, format='wav')
-            audio_bytes.seek(0)
-            audio, orig_freq = torchaudio.load(audio_bytes)
-            audio = torchaudio.functional.resample(audio, orig_freq=orig_freq, new_freq=16_000)
-            audio_inputs = processor(audios=audio, return_tensors="pt")
-            output_tokens = model.generate(**audio_inputs, tgt_lang=target_language, generate_speech=False)
-            translated_text += processor.decode(output_tokens[0].tolist()[0], skip_special_tokens=True)
-        return translated_text
+   "speech to text + text2text translation"
+   def __init__(self):
+    self.speech2text_obj=SpeechToText()
+    self.texttranslation_obj=TextTranslation()
+
+   def speech_to_text_translation(self,audio_url:str,source_language:str,target_language:str):
+      text=self.speech2text_obj.speech_to_text(audio_url,source_language)
+      translated_text=self.texttranslation_obj.text_translation(text,source_language,target_language)
+      return translated_text
+       
 
 
 @app.get("/")
@@ -380,9 +353,9 @@ def get_all_audio_segments():
         return {"segments":segment_dicts}
 
 @app.get('/get_translated_text/')
-async def speech_to_text_translation(audio_url:str,target_language:str):
+async def speech_to_text_translation(audio_url:str,source_language:str,target_language:str):
     speech2texttranslation_obj=SpeechToTextTranslation()
-    translated_text=speech2texttranslation_obj.speech_to_text_translation(audio_url,target_language)
+    translated_text=speech2texttranslation_obj.speech_to_text_translation(audio_url,source_language,target_language)
     if translated_text is None:
         return JSONResponse(status_code=404, content={"message": "No text could be extracted from the audio."})
     return JSONResponse(status_code=200, content={"translated text": translated_text})
@@ -412,3 +385,5 @@ async def text_to_speech(text:str,audio_url:str):
     return Response(content=audio_bytes, media_type="audio/wav")
 
 
+
+	
