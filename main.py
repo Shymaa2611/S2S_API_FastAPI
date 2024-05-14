@@ -14,6 +14,8 @@ from io import BytesIO
 from pyannote.audio import Pipeline
 import soundfile as sf
 from fastapi_cors import CORS
+import torchaudio
+from transformers import AutoProcessor, SeamlessM4Tv2Model
 from functools import lru_cache
 DATABASE_URL = "sqlite:///./sql_app.db"
 engine = create_engine(DATABASE_URL)
@@ -33,123 +35,103 @@ app.add_middleware(
 """
 Base.metadata.create_all(engine)
 
-@app.get("/")
-def root():
-    return {"message": "No result"}
+class AudioUtility:
 
-#add audio segements in Audio_segment Table
-def create_segment(start_time: float, end_time: float, audio: AudioSegment, type: str):
-    session = Session()
-    audio_bytes = BytesIO()
-    audio.export(audio_bytes, format='wav')
-    audio_bytes = audio_bytes.getvalue()
-    segment = Audio_segment(start_time=start_time, end_time=end_time, type=type, audio=audio_bytes)
-    session.add(segment)
-    session.commit()
-    session.close()
+    def create_segment(self,start_time: float, end_time: float, audio: AudioSegment, type: str):
+      session=Session()
+      audio_bytes = BytesIO()
+      audio.export(audio_bytes, format='wav')
+      audio_bytes = audio_bytes.getvalue()
+      segment = Audio_segment(start_time=start_time, end_time=end_time, type=type, audio=audio_bytes)
+      session.add(segment)
+      session.commit()
+      session.close()
+      return {"status_code": 200, "message": "success"}
 
-    return {"status_code": 200, "message": "success"}
+    def generate_target(self,audio: AudioSegment):
+      session=Session()
+      audio_bytes = BytesIO()
+      audio.export(audio_bytes, format='wav')
+      audio_bytes = audio_bytes.getvalue()
+      target_audio = AudioGeneration(audio=audio_bytes)
+      session.add(target_audio)
+      session.commit()
+      session.close()
 
-#add target audio to AudioGeneration Table
-def generate_target(audio: AudioSegment):
-    session = Session() 
-    audio_bytes = BytesIO()
-    audio.export(audio_bytes, format='wav')
-    audio_bytes = audio_bytes.getvalue()
-    target_audio = AudioGeneration(audio=audio_bytes)
-    session.add(target_audio)
-    session.commit()
-    session.close()
-
-    return {"status_code": 200, "message": "success"}
-
-@lru_cache(maxsize=None)
-def load_segmentation_model():
-    pipeline = Pipeline.from_pretrained(
-     "pyannote/speaker-diarization-3.0",
-    use_auth_token="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")
-    return pipeline
-
-
-"""
-audio segmentation into speech and non-speech using segmentation model
-"""
-def audio_speech_nonspeech_detection(audio_url):
-    pipeline=load_segmentation_model()
-    diarization = pipeline(audio_url)
-    speaker_regions=[]
-    for turn, _,speaker in  diarization.itertracks(yield_label=True):
+      return {"status_code": 200, "message": "success"}
+    
+    def construct_audio(self):
+      session=Session()
+    # Should be ordered by start_time
+      segments =session.query(Audio_segment).order_by('start_time').all()
+      audio_files = []
+      for segment in segments:
+         audio_files.append(AudioSegment.from_file(BytesIO(segment.audio), format='wav'))
+      target_audio = sum(audio_files, AudioSegment.empty())
+      self.generate_target(audio=target_audio)
+    # Delete all records in Audio_segment table
+      session.query(Audio_segment).delete()
+      session.commit()
+      session.close()
+   
+class AudioSegmentation:
+    def __init__(self):
+        self.audioUtility_obj=AudioUtility()
+    
+    @lru_cache(maxsize=None)
+    def load_segmentation_model(self):
+       pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.0",
+       use_auth_token="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")
+       return pipeline
+    
+    def audio_speech_nonspeech_detection(self,audio_url):
+       pipeline =self.load_segmentation_model()
+       diarization = pipeline(audio_url)
+       speaker_regions=[]
+       for turn, _,speaker in  diarization.itertracks(yield_label=True):
          speaker_regions.append({"start":turn.start,"end":turn.end})
-    sound = AudioSegment.from_wav(audio_url)
-    speaker_regions.sort(key=lambda x: x['start'])
-    non_speech_regions = []
-    for i in range(1, len(speaker_regions)):
-        start = speaker_regions[i-1]['end'] 
-        end = speaker_regions[i]['start']   
-        if end > start:
+       sound = AudioSegment.from_wav(audio_url)
+       speaker_regions.sort(key=lambda x: x['start'])
+       non_speech_regions = []
+       for i in range(1, len(speaker_regions)):
+         start = speaker_regions[i-1]['end'] 
+         end = speaker_regions[i]['start']   
+         if end > start:
             non_speech_regions.append({'start': start, 'end': end})
-    first_speech_start = speaker_regions[0]['start']
-    if first_speech_start > 0:
+       first_speech_start = speaker_regions[0]['start']
+       if first_speech_start > 0:
           non_speech_regions.insert(0, {'start': 0, 'end': first_speech_start})
-    last_speech_end = speaker_regions[-1]['end']
-    total_audio_duration = len(sound)  
-    if last_speech_end < total_audio_duration:
+       last_speech_end = speaker_regions[-1]['end']
+       total_audio_duration = len(sound)  
+       if last_speech_end < total_audio_duration:
             non_speech_regions.append({'start': last_speech_end, 'end': total_audio_duration})
-    return speaker_regions,non_speech_regions
+       return speaker_regions,non_speech_regions
 
-"""
-save speech and non-speech segments in audio_segment table
-"""
-def split_audio_segments(audio_url):
-    sound = AudioSegment.from_wav(audio_url)
-    speech_segments, non_speech_segment = audio_speech_nonspeech_detection(audio_url)
-    # Process speech segments
-    for i, speech_segment in enumerate(speech_segments):
-        start = int(speech_segment['start'] * 1000)  
-        end = int(speech_segment['end'] * 1000)  
-        segment = sound[start:end]
-        create_segment(start_time=start/1000,
+    def split_audio_segments(self,audio_url):
+       sound = AudioSegment.from_wav(audio_url)
+       speech_segments, non_speech_segment = self.audio_speech_nonspeech_detection(audio_url)
+       # Process speech segments
+       for i, speech_segment in enumerate(speech_segments):
+         start = int(speech_segment['start'] * 1000)  
+         end = int(speech_segment['end'] * 1000)  
+         segment = sound[start:end]
+         self.audioUtility_obj.create_segment(start_time=start/1000,
             end_time=end/1000,
             type="speech",audio=segment)
-    # Process non-speech segments 
-    for i, non_speech_segment in enumerate(non_speech_segment):
-        start = int(non_speech_segment['start'] * 1000)  
-        end = int(non_speech_segment['end'] * 1000)  
-        segment = sound[start:end]
-        create_segment(start_time=start/1000,
+       # Process non-speech segments 
+       for i, non_speech_segment in enumerate(non_speech_segment):
+          start = int(non_speech_segment['start'] * 1000)  
+          end = int(non_speech_segment['end'] * 1000)  
+          segment = sound[start:end]
+          self.audioUtility_obj.create_segment(start_time=start/1000,
             end_time=end/1000,
             type="non-speech",audio=segment)
 
-
-def detect_language(source_language:str,target_language:str):
-    if source_language=="english":
-           source_language="eng_Latn"
-           if target_language=="chinese":
-                target_language="zho_Hant"
-           else:
-               target_language="arz_Arab"
-    else:
-            source_language="arz_Arab"
-            target_language="eng_Latn"
-    return source_language,target_language
-
-@lru_cache(maxsize=None)
-def load_NLLB_model():
-   pipe_trans = pipeline("translation", model="facebook/nllb-200-distilled-600M")
-   return pipe_trans
-#@app.post("/translate/")
-def text_translation(text,source_language:str,target_language:str):
-    source_language,target_language=detect_language(source_language,target_language)
-    pipe=load_NLLB_model()
-    result=pipe(text,src_lang=source_language,tgt_lang=target_language)
-    return result[0]['translation_text']
-
-
-def make_prompt_audio(name,audio_path):
-    make_prompt(name=name, audio_prompt_path=audio_path)
-
-@lru_cache(maxsize=None)
-def load_whisper_model():
+class SpeechToText:
+ 
+   @lru_cache(maxsize=None)
+   def load_whisper_model(self):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model_id = "openai/whisper-large-v3"
@@ -171,66 +153,137 @@ def load_whisper_model():
     )
     return pipe
      
-# whisper model for speech to text process (english language)
-#@app.post("/speech_text/")   
-def speech_to_text_process(segment,source_language:str):
-    pipe=load_whisper_model()
+   def speech_to_text_process(self,segment,source_language:str):
+    pipe=self.load_whisper_model()
     result = pipe(segment,generate_kwargs={"language":source_language})
     return result["text"]
+   
+   def speech_to_text(self,audio_url:str,target_language:str):
+       pipe=self.load_whisper_model()
+       result = pipe(audio_url,generate_kwargs={"language":target_language})
+       return result["text"]
+   
+class TextTranslation:
+    def detect_language(self,source_language:str,target_language:str):
+       if source_language=="english":
+           source_language="eng_Latn"
+           if target_language=="chinese":
+                target_language="zho_Hant"
+           else:
+               target_language="arz_Arab"
+       else:
+            source_language="arz_Arab"
+            target_language="eng_Latn"
+       return source_language,target_language
 
-#text to speech using VALL-E-X model 
-#@app.post("/text_to_speech/")  
-def text_to_speech(segment_id, target_text, audio_prompt):
-    preload_models()
-    session = Session()
-    segment = session.query(Audio_segment).get(segment_id)
-    make_prompt_audio(name=f"audio_{segment_id}",audio_path=audio_prompt)
-    audio_array = generate_audio(target_text,f"audio_{segment_id}")
-    temp_file = BytesIO()
-    sf.write(temp_file, audio_array, SAMPLE_RATE, format='wav')
-    temp_file.seek(0)
-    segment.audio = temp_file.getvalue()
-    session.commit()
-    session.close()
-    temp_file.close()
+    @lru_cache(maxsize=None)
+    def load_NLLB_model(self):
+      pipe_trans = pipeline("translation", model="facebook/nllb-200-distilled-600M")
+      return pipe_trans
+    
+    def text_translation(self,text,source_language:str,target_language:str):
+      pipe=self.load_NLLB_model()
+      source_language,target_language=self.detect_language(source_language,target_language)
+      result=pipe(text,src_lang=source_language,tgt_lang=target_language)
+      return result[0]['translation_text']
+
+class TextToSpeech:
+   def __init__(self):
+      self.audioUtility_obj=AudioUtility()
+
+   def make_prompt_audio(self,name,audio_path):
+     make_prompt(name=name, audio_prompt_path=audio_path)
+      
+   def text_to_speech_process(self,segment_id, target_text, audio_prompt):
+     session=Session()
+     preload_models()
+     segment = session.query(Audio_segment).get(segment_id)
+     self.make_prompt_audio(name=f"audio_{segment_id}",audio_path=audio_prompt)
+     audio_array = generate_audio(target_text,f"audio_{segment_id}")
+     temp_file = BytesIO()
+     sf.write(temp_file, audio_array, SAMPLE_RATE, format='wav')
+     temp_file.seek(0)
+     segment.audio = temp_file.getvalue()
+     session.commit()
+     session.close()
+     temp_file.close()
     #os.remove(temp_file)
 
-"""
-reconstruct target audio using all updated segment
-in audio_segment table and then remove all audio_Segment records
-"""
-def construct_audio():
+   def extract_15_seconds(self,audio_data, start_time, end_time):
+    audio_segment = AudioSegment.from_file(BytesIO(audio_data), format='wav')
+    start_ms = start_time * 1000  
+    end_ms = min((start_time + 15) * 1000, end_time * 1000)  
+    extracted_segment = audio_segment[start_ms:end_ms]
+    temp_wav_path = "temp.wav"
+    extracted_segment.export(temp_wav_path, format="wav")
+    return temp_wav_path
+   
+   def check_audio_duration(self,audio_url):
+    audio, sample_rate = torchaudio.load(audio_url)
+    duration_in_seconds = audio.size(1) / sample_rate
+    return duration_in_seconds > 15
+
+   def split_text_into_chunks(self,text:str, chunk_size=10):
+    words = text.split()
+    chunks = []
+    for i in range(0, len(words), chunk_size):
+        chunk = " ".join(words[i:i+chunk_size])
+        chunks.append(chunk)
+    return chunks
+
+   def chunk_to_speech(self, chunks):
     session = Session()
-    # Should be ordered by start_time
-    segments = session.query(Audio_segment).order_by('start_time').all()
-    audio_files = []
-    for segment in segments:
-        audio_files.append(AudioSegment.from_file(BytesIO(segment.audio), format='wav'))
-    target_audio = sum(audio_files, AudioSegment.empty())
-    generate_target(audio=target_audio)
-    
-    # Delete all records in Audio_segment table
-    session.query(Audio_segment).delete()
-    session.commit()
+    for chunk in chunks:
+        audio_array = generate_audio(chunk, prompt="person")
+        temp_file_path = "temp.wav"
+        sf.write(temp_file_path, audio_array, SAMPLE_RATE, format='wav')
+        with open(temp_file_path, "rb") as file:
+            audio_bytes = file.read()
+        
+        self.audioUtility_obj.create_segment(start_time=0.0,
+                                             end_time=0.0,
+                                             type=None,
+                                             audio=audio_bytes)
+        os.remove(temp_file_path)
     session.close()
 
-"""
-source  => english speech
-target  => arabic speeech
-"""
+   def text_to_speech(self, text: str, audio_url: str):
+    chunks = self.split_text_into_chunks(text, chunk_size=10)
+    preload_models()
+    if self.check_audio_duration(audio_url):
+        audio = AudioSegment.from_file(audio_url)
+        first_15_seconds = audio[:15000]
+        new_audio_path = "temp_audio.wav"
+        first_15_seconds.export(new_audio_path, format="wav")
+        make_prompt(name="person", audio_prompt_path=new_audio_path)
+        self.chunk_to_speech(chunks)
+        os.remove(new_audio_path)
+    else:
+        make_prompt(name="person", audio_prompt_path=audio_url)
+        self.chunk_to_speech(chunks)
 
-#@app.post("/speech_translation/")
-def speech_to_speech_translation(audio_url,source_language:str,target_language:str):
+    self.audioUtility_obj.construct_audio()
+
+    
+class SpeechToSpeechTranslation:
+   def __init__(self):
+        self.audiosegmentation_obj=AudioSegmentation()
+        self.texttranslation_obj=TextTranslation()
+        self.speech2text_obj=SpeechToText()
+        self.text2tspeech_obj=TextToSpeech()
+        self.audioUtility_obj=AudioUtility()
+
+   def speech_to_speech_translation(self,audio_url,source_language:str,target_language:str):
     session=Session()
     target_text=None
-    split_audio_segments(audio_url)
+    self.audiosegmentation_obj.split_audio_segments(audio_url)
     #filtering by type
     speech_segments = session.query(Audio_segment).filter(Audio_segment.type == "speech").all()
     for segment in speech_segments:
         audio_data = segment.audio
-        text = speech_to_text_process(audio_data,source_language)
+        text =self.speech2text_obj.speech_to_text_process(audio_data,source_language)
         if text:
-            target_text=text_translation(text,source_language,target_language)
+            target_text=self.texttranslation_obj.text_translation(text,source_language,target_language)
         else:
             print("speech_to_text_process function not return result. ")
         if target_text is None:
@@ -239,31 +292,70 @@ def speech_to_speech_translation(audio_url,source_language:str,target_language:s
            segment_id = segment.id
            segment_duration = segment.end_time - segment.start_time
            if segment_duration <=15:
-                text_to_speech(segment_id,target_text,segment.audio)
+              self.text2tspeech_obj.text_to_speech_process(segment_id,target_text,segment.audio)
            else:
-                audio_data=extract_15_seconds(segment.audio,segment.start_time,segment.end_time)
-                text_to_speech(segment_id,target_text,audio_data)
+                audio_data= self.text2tspeech_obj.extract_15_seconds(segment.audio,segment.start_time,segment.end_time)
+                self.text2tspeech_obj.text_to_speech_process(segment_id,target_text,audio_data)
                 os.remove(audio_data)
-    construct_audio()
-    return JSONResponse(status_code=200, content={"status_code":"succcessfully"})
+    self.audioUtility_obj.construct_audio()
     
+class SpeechToTextTranslation:
+  def __init__(self):
+       self.audioutility=AudioUtility()
+  
+  @lru_cache(maxsize=None)
+  def load_seamless_model(self):
+   processor = AutoProcessor.from_pretrained("facebook/seamless-m4t-v2-large")
+   model = SeamlessM4Tv2Model.from_pretrained("facebook/seamless-m4t-v2-large")
+   return processor,model
+  
+  def detect_target_language(self,target_language):
+     if target_language=="english":
+        target_language="eng"
+     elif target_language=="arabic":
+        target_language="arz"
+     elif target_language=="chinese":
+        target_language="cmn"
+     return target_language
+           
+  def speech_to_text_translation(self, audio_url: str, target_language: str):
+        processor,model=self.load_seamless_model()
+        translated_text = ""
+        target_language = self.detect_target_language(target_language)
+        audio = AudioSegment.from_file(audio_url)
+        segment_length_ms = 5000
+        for i in range(0, len(audio), segment_length_ms):
+            segment = audio[i:i + segment_length_ms]
+            audio_bytes = BytesIO()
+            segment.export(audio_bytes, format='wav')
+            audio_bytes.seek(0)
+            audio, orig_freq = torchaudio.load(audio_bytes)
+            audio = torchaudio.functional.resample(audio, orig_freq=orig_freq, new_freq=16_000)
+            audio_inputs = processor(audios=audio, return_tensors="pt")
+            output_tokens = model.generate(**audio_inputs, tgt_lang=target_language, generate_speech=False)
+            translated_text += processor.decode(output_tokens[0].tolist()[0], skip_special_tokens=True)
+        return translated_text
+
+
+@app.get("/")
+async def root():
+    return {"message": "No result"}
 
 @app.get("/get_audio/")
 async def get_audio(audio_url,source_language,target_language):
-    speech_to_speech_translation(audio_url,source_language,target_language)
+    speech2speechtranslation_obj=SpeechToSpeechTranslation()
+    speech2speechtranslation_obj.speech_to_speech_translation(audio_url,source_language,target_language)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
     # Remove target audio from database
-    #session.query(AudioGeneration).delete()
+    #session.delete(target_audio)
     #session.commit()
-    #session.close()
     if target_audio is None:
         raise ValueError("No audio found in the database")
     
     audio_bytes = target_audio.audio
     return Response(content=audio_bytes, media_type="audio/wav")
-
 
 @app.get("/audio_segments/")
 def get_all_audio_segments():
@@ -288,15 +380,55 @@ def get_all_audio_segments():
         session.close()
         return {"segments":segment_dicts}
 
+@app.get('/get_translated_text/')
+async def speech_to_text_translation(audio_url:str,target_language:str):
+    speech2texttranslation_obj=SpeechToTextTranslation()
+    translated_text=speech2texttranslation_obj.speech_to_text_translation(audio_url,target_language)
+    if translated_text is None:
+        return JSONResponse(status_code=404, content={"message": "No text could be extracted from the audio."})
+    return JSONResponse(status_code=200, content={"translated text": translated_text})
 
-def extract_15_seconds(audio_data, start_time, end_time):
-    audio_segment = AudioSegment.from_file(BytesIO(audio_data), format='wav')
-    start_ms = start_time * 1000  
-    end_ms = min((start_time + 15) * 1000, end_time * 1000)  
-    extracted_segment = audio_segment[start_ms:end_ms]
-    temp_wav_path = "temp.wav"
-    extracted_segment.export(temp_wav_path, format="wav")
+@app.get("/get_text/")
+async def speech_to_text(audio_url:str,target_language:str):
+    speech2text_obj=SpeechToText()
+    result=speech2text_obj.speech_to_text(audio_url,target_language)
+    if result is None:
+        return JSONResponse(status_code=404, content={"message": "No text could be extracted from the audio."})
+    return JSONResponse(status_code=200, content={"text": result})
 
-    return temp_wav_path
+@app.get("/get_speech/")
+async def text_to_speech(text:str,audio_url:str):
+    text2speech_obj=TextToSpeech()
+    text2speech_obj.text_to_speech(text,audio_url)
+    session = Session()
+    # Get target audio from AudioGeneration
+    target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
+    # Remove target audio from database
+    #session.delete(target_audio)
+    #session.commit()
+    if target_audio is None:
+        raise ValueError("No audio found in the database")
+    
+    audio_bytes = target_audio.audio
+    return Response(content=audio_bytes, media_type="audio/wav")
 
 
+
+if __name__=="main":
+    #audio_url="/content/English in a Minute- Party Animal.wav"
+    #text=speech_to_text(audio_url,"arabic")
+    #print(text)
+    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
+   
+if __name__=="main":
+    audio_url="/content/audio_2.wav"
+    text="""
+	 Lily was known far and wide for her ingenious creations, 
+	 from quirky gadgets to life-changing machines. 
+	 She lived in a small workshop filled with gears, wires,
+	 and contraptions of all sorts.
+	 """
+    text_to_speech(text,audio_url)
+	 
+
+    print("Done !")
