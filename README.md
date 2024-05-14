@@ -11,8 +11,7 @@
 - automatic speech recognition (Whisper)
 - machine translation (No Language Left Behind)
 - text to speech (VALL-E-X)
-
-
+<br/><br/>
 
 ![S2ST](api_process_image.jpg)
 
