@@ -413,22 +413,3 @@ async def text_to_speech(text:str,audio_url:str):
     return Response(content=audio_bytes, media_type="audio/wav")
 
 
-
-if __name__=="main":
-    #audio_url="/content/English in a Minute- Party Animal.wav"
-    #text=speech_to_text(audio_url,"arabic")
-    #print(text)
-    audio_url="C:\\Users\\dell\\Downloads\\Music\\audio_2.wav"
-   
-if __name__=="main":
-    audio_url="/content/audio_2.wav"
-    text="""
-	 Lily was known far and wide for her ingenious creations, 
-	 from quirky gadgets to life-changing machines. 
-	 She lived in a small workshop filled with gears, wires,
-	 and contraptions of all sorts.
-	 """
-    text_to_speech(text,audio_url)
-	 
-
-    print("Done !")
