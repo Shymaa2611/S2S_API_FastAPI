@@ -12,7 +12,10 @@
 - machine translation (No Language Left Behind)
 - text to speech (VALL-E-X)
 
+
+
 ![S2ST](api_process_image.jpg)
+
 
 ## Technologies
 - FASTAPI
