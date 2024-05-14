@@ -158,9 +158,9 @@ class SpeechToText:
     result = pipe(segment,generate_kwargs={"language":source_language})
     return result["text"]
    
-   def speech_to_text(self,audio_url:str,target_language:str):
+   def speech_to_text(self,audio_url:str,source_language:str):
        pipe=self.load_whisper_model()
-       result = pipe(audio_url,generate_kwargs={"language":target_language})
+       result = pipe(audio_url,generate_kwargs={"language":source_language})
        return result["text"]
    
 class TextTranslation:
@@ -264,7 +264,6 @@ class TextToSpeech:
 
     self.audioUtility_obj.construct_audio()
 
-    
 class SpeechToSpeechTranslation:
    def __init__(self):
         self.audiosegmentation_obj=AudioSegmentation()
@@ -389,9 +388,9 @@ async def speech_to_text_translation(audio_url:str,target_language:str):
     return JSONResponse(status_code=200, content={"translated text": translated_text})
 
 @app.get("/get_text/")
-async def speech_to_text(audio_url:str,target_language:str):
+async def speech_to_text(audio_url:str,source_language:str):
     speech2text_obj=SpeechToText()
-    result=speech2text_obj.speech_to_text(audio_url,target_language)
+    result=speech2text_obj.speech_to_text(audio_url,source_language)
     if result is None:
         return JSONResponse(status_code=404, content={"message": "No text could be extracted from the audio."})
     return JSONResponse(status_code=200, content={"text": result})
