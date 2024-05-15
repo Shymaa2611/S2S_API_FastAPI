@@ -314,7 +314,7 @@ async def root():
     return {"message": "No result"}
 
 @app.get("/get_audio/")
-async def get_audio(audio_url,source_language,target_language):
+async def speech_to_speech_translation(audio_url,source_language,target_language):
     speech2speechtranslation_obj=SpeechToSpeechTranslation()
     speech2speechtranslation_obj.speech_to_speech_translation(audio_url,source_language,target_language)
     session = Session()
@@ -383,5 +383,7 @@ async def get_all_audio_segments():
             })
         session.close()
         return {"segments":segment_dicts}
+
+
 
 
