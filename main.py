@@ -318,7 +318,7 @@ async def root():
     return {"message": "No result"}
 
 @app.get("/get_audio/")
-async def speech_to_speech_translation(audio_url,source_language,target_language):
+async def speech_to_speech_translation(audio_url:str,source_language:str,target_language:str):
     speech2speechtranslation_obj=SpeechToSpeechTranslation()
     speech2speechtranslation_obj.speech_to_speech_translation(audio_url,source_language,target_language)
     session = Session()
