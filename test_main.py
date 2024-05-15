@@ -93,7 +93,7 @@ def test_text_to_speech():
     assert response.headers["Content-Type"] == "audio/wav", "Response is not audio"
     print("Test passed:Audio retrieved successfully")
 
-def test_get_audio():
+def test_speech_to_speech_translation():
     client = TestClient(app)
     test_params = {
         "audio_url": "C:\\Users\\dell\\Downloads\\Music\\audio.wav",
