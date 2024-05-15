@@ -153,17 +153,21 @@ class SpeechToText:
     return pipe
      
    def speech_to_text_process(self,segment,source_language:str):
+    source_language=source_language.lower()
     pipe=self.load_whisper_model()
     result = pipe(segment,generate_kwargs={"language":source_language})
     return result["text"]
    
    def speech_to_text(self,audio_url:str,source_language:str):
+       source_language=source_language.lower()
        pipe=self.load_whisper_model()
        result = pipe(audio_url,generate_kwargs={"language":source_language})
        return result["text"]
    
 class TextTranslation:
     def detect_language(self,source_language:str,target_language:str):
+       source_language=source_language.lower()
+       target_language=target_language.lower()
        if source_language=="english":
            source_language="eng_Latn"
            if target_language=="chinese":
