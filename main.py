@@ -158,11 +158,28 @@ class SpeechToText:
     result = pipe(segment,generate_kwargs={"language":source_language})
     return result["text"]
    
+   def split_audio(self,audio_url):
+       audio = AudioSegment.from_file(audio_url)
+       duration = len(audio) / 1000  
+       if duration <= 15:
+            return [audio]
+       chunks = []
+       chunk_length = 15 * 1000  
+       for i in range(0, len(audio), chunk_length):
+            chunks.append(audio[i:i + chunk_length])
+       return chunks
+   
    def speech_to_text(self,audio_url:str,source_language:str):
        source_language=source_language.lower()
        pipe=self.load_whisper_model()
-       result = pipe(audio_url,generate_kwargs={"language":source_language})
-       return result["text"]
+       chunks = self.split_audio(audio_url)
+       text = ""
+       for chunk in chunks:
+            chunk_bytes = chunk.export(format="wav").read()
+            result = pipe(chunk_bytes, generate_kwargs={"language": source_language})
+            text += result["text"] + " "
+
+       return text.strip()
    
 class TextTranslation:
     def detect_language(self,source_language:str,target_language:str):
@@ -184,11 +201,36 @@ class TextTranslation:
       pipe_trans = pipeline("translation", model="facebook/nllb-200-distilled-600M")
       return pipe_trans
     
-    def text_translation(self,text,source_language:str,target_language:str):
-      pipe=self.load_NLLB_model()
-      source_language,target_language=self.detect_language(source_language,target_language)
-      result=pipe(text,src_lang=source_language,tgt_lang=target_language)
-      return result[0]['translation_text']
+    def split_text_into_chunks(self, text: str, chunk_size=150):
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), chunk_size):
+            chunk = " ".join(words[i:i + chunk_size])
+            chunks.append(chunk)
+        return chunks
+
+    def text_translation(self, text: str, source_language: str, target_language: str):
+        pipe = self.load_NLLB_model()
+        source_language, target_language = self.detect_language(source_language, target_language)
+        translated_text = ""
+        words = text.split()
+
+        if len(words) > 150:
+            chunks = self.split_text_into_chunks(text)
+            for chunk in chunks:
+                result = pipe(chunk, src_lang=source_language, tgt_lang=target_language)
+                if result and isinstance(result, list) and 'translation_text' in result[0]:
+                    translated_text += result[0]['translation_text'] + " "
+                else:
+                    raise ValueError("Translation failed or returned an unexpected result.")
+        else:
+            result = pipe(text, src_lang=source_language, tgt_lang=target_language)
+            if result and isinstance(result, list) and 'translation_text' in result[0]:
+                translated_text = result[0]['translation_text']
+            else:
+                raise ValueError("Translation failed or returned an unexpected result.")
+        
+        return translated_text.strip()
 
 class TextToSpeech:
    def __init__(self):
@@ -310,7 +352,7 @@ class SpeechToTextTranslation:
       text=self.speech2text_obj.speech_to_text(audio_url,source_language)
       translated_text=self.texttranslation_obj.text_translation(text,source_language,target_language)
       return translated_text
-       
+        
 
 
 @app.get("/")
@@ -387,7 +429,6 @@ async def get_all_audio_segments():
             })
         session.close()
         return {"segments":segment_dicts}
-
 
 
 
