@@ -79,9 +79,10 @@ class AudioSegmentation:
     
     @lru_cache(maxsize=None)
     def load_segmentation_model(self):
-       pipeline = Pipeline.from_pretrained(
-        "V-Segmentation_checkpoint\\config.yaml")
-       return pipeline
+      pipeline = Pipeline.from_pretrained(
+       "pyannote/speaker-diarization-3.0",
+       use_auth_token="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")
+      return pipeline
     
     def audio_speech_nonspeech_detection(self,audio_url):
        pipeline =self.load_segmentation_model()
@@ -411,6 +412,4 @@ async def get_all_audio_segments():
             })
         session.close()
         return {"segments":segment_dicts}
-
-
 
