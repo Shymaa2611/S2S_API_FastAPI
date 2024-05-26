@@ -8,7 +8,7 @@ from fastapi import FastAPI, Response
 import torch
 from fastapi.responses import JSONResponse
 from utils.prompt_making import make_prompt
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+from transformers import pipeline
 from utils.generation import SAMPLE_RATE, generate_audio, preload_models
 from io import BytesIO
 from pyannote.audio import Pipeline
@@ -79,9 +79,7 @@ class AudioSegmentation:
     
     @lru_cache(maxsize=None)
     def load_segmentation_model(self):
-      pipeline = Pipeline.from_pretrained(
-       "pyannote/speaker-diarization-3.0",
-       use_auth_token="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")
+      pipeline = Pipeline.from_pretrained("V-Segmentation_checkpoint\\config.yaml")
       return pipeline
     
     def audio_speech_nonspeech_detection(self,audio_url):
@@ -412,4 +410,3 @@ async def get_all_audio_segments():
             })
         session.close()
         return {"segments":segment_dicts}
-
