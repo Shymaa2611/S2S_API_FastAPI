@@ -182,33 +182,15 @@ class TextTranslation:
       pipe_trans=pipeline("translation",model="NLLB_checkpoint")
       return pipe_trans
     
-    def split_text_into_chunks(self, text: str, chunk_size=150):
-        words = text.split()
-        chunks = []
-        for i in range(0, len(words), chunk_size):
-            chunk = " ".join(words[i:i + chunk_size])
-            chunks.append(chunk)
-        return chunks
-
+ 
     def text_translation(self, text: str, source_language: str, target_language: str):
         pipe = self.load_NLLB_model()
         source_language, target_language = self.detect_language(source_language, target_language)
         translated_text = ""
-        words = text.split()
-
-        if len(words) > 150:
-            chunks = self.split_text_into_chunks(text)
-            for chunk in chunks:
-                result = pipe(chunk, src_lang=source_language, tgt_lang=target_language)
-                if result and isinstance(result, list) and 'translation_text' in result[0]:
-                    translated_text += result[0]['translation_text'] + " "
-                else:
-                    raise ValueError("Translation failed or returned an unexpected result.")
-        else:
-            result = pipe(text, src_lang=source_language, tgt_lang=target_language)
-            if result and isinstance(result, list) and 'translation_text' in result[0]:
+        result = pipe(text, src_lang=source_language, tgt_lang=target_language)
+        if result and isinstance(result, list) and 'translation_text' in result[0]:
                 translated_text = result[0]['translation_text']
-            else:
+        else:
                 raise ValueError("Translation failed or returned an unexpected result.")
         
         return translated_text.strip()
