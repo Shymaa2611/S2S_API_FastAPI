@@ -35,7 +35,12 @@ app.add_middleware(
 Base.metadata.create_all(engine)
 
 class AudioUtility:
-
+    def audio_Conversion(self,audio_url:str):
+        original_extension = os.path.splitext(audio_url)[1].lower()
+        audio = AudioSegment.from_file(audio_url)
+        wav_file = "temp.wav"
+        audio.export(wav_file, format='wav')
+        return original_extension
     def create_segment(self,start_time: float, end_time: float, audio: AudioSegment, type: str):
       session=Session()
       audio_bytes = BytesIO()
@@ -126,7 +131,6 @@ class AudioSegmentation:
             type="non-speech",audio=segment)
 
 class SpeechToText:
- 
    @lru_cache(maxsize=None)
    def load_whisper_model(self):
     pipe=pipeline("automatic-speech-recognition",model="whisperLarge_checkpoint")
@@ -178,23 +182,19 @@ class TextTranslation:
 
     @lru_cache(maxsize=None)
     def load_NLLB_model(self):
-      #pipe_trans = pipeline("translation", model="facebook/nllb-200-distilled-600M")
       pipe_trans=pipeline("translation",model="NLLB_checkpoint")
       return pipe_trans
     
- 
+   
     def text_translation(self, text: str, source_language: str, target_language: str):
         pipe = self.load_NLLB_model()
         source_language, target_language = self.detect_language(source_language, target_language)
-        translated_text = ""
         result = pipe(text, src_lang=source_language, tgt_lang=target_language)
         if result and isinstance(result, list) and 'translation_text' in result[0]:
-                translated_text = result[0]['translation_text']
+                return result[0]['translation_text']
         else:
                 raise ValueError("Translation failed or returned an unexpected result.")
         
-        return translated_text.strip()
-
 class TextToSpeech:
    def __init__(self):
       self.audioUtility_obj=AudioUtility()
@@ -238,8 +238,9 @@ class TextToSpeech:
         chunk = " ".join(words[i:i+chunk_size])
         chunks.append(chunk)
     return chunks
-
+   
    def chunk_to_speech(self, chunks):
+    count=0.0
     session = Session()
     for chunk in chunks:
         audio_array = generate_audio(chunk, prompt="person")
@@ -247,10 +248,11 @@ class TextToSpeech:
         sf.write(temp_file_path, audio_array, SAMPLE_RATE, format='wav')
         sound = AudioSegment.from_wav(temp_file_path)
         
-        self.audioUtility_obj.create_segment(start_time=0.0,
+        self.audioUtility_obj.create_segment(start_time=count,
                                              end_time=0.0,
                                              type=None,
                                              audio=sound)
+        count+=1
         os.remove(temp_file_path)
     session.close()
 
@@ -259,9 +261,9 @@ class TextToSpeech:
     preload_models()
     if self.check_audio_duration(audio_url):
         audio = AudioSegment.from_file(audio_url)
-        first_15_seconds = audio[:15000]
+        first_3_seconds = audio[:3000]
         new_audio_path = "temp_audio.wav"
-        first_15_seconds.export(new_audio_path, format="wav")
+        first_3_seconds.export(new_audio_path, format="wav")
         make_prompt(name="person", audio_prompt_path=new_audio_path)
         self.chunk_to_speech(chunks)
         os.remove(new_audio_path)
@@ -316,16 +318,16 @@ class SpeechToTextTranslation:
       translated_text=self.texttranslation_obj.text_translation(text,source_language,target_language)
       return translated_text
         
-
-
 @app.get("/")
 async def root():
     return {"message": "No result"}
 
 @app.get("/get_audio/")
 async def speech_to_speech_translation(audio_url:str,source_language:str,target_language:str):
+    audioutility_obj=AudioUtility()
+    original_extension=audioutility_obj.audio_Conversion(audio_url)
     speech2speechtranslation_obj=SpeechToSpeechTranslation()
-    speech2speechtranslation_obj.speech_to_speech_translation(audio_url,source_language,target_language)
+    speech2speechtranslation_obj.speech_to_speech_translation("temp.wav",source_language,target_language)
     session = Session()
     # Get target audio from AudioGeneration
     target_audio = session.query(AudioGeneration).order_by(AudioGeneration.id.desc()).first()
@@ -336,26 +338,39 @@ async def speech_to_speech_translation(audio_url:str,source_language:str,target_
         raise ValueError("No audio found in the database")
     
     audio_bytes = target_audio.audio
-    return Response(content=audio_bytes, media_type="audio/wav")
+    os.remove("temp.wav")
+    media_type = f"audio/{original_extension.lstrip('.')}"
+    return Response(content=audio_bytes,media_type=media_type)
 
 @app.get('/get_translated_text/')
 async def speech_to_text_translation(audio_url:str,source_language:str,target_language:str):
+    audioutility_obj=AudioUtility()
+    original_extension=audioutility_obj.audio_Conversion(audio_url)
+    audio_url="temp.wav"
     speech2texttranslation_obj=SpeechToTextTranslation()
     translated_text=speech2texttranslation_obj.speech_to_text_translation(audio_url,source_language,target_language)
+    os.remove(audio_url)
     if translated_text is None:
         return JSONResponse(status_code=404, content={"message": "No text could be extracted from the audio."})
     return JSONResponse(status_code=200, content={"translated text": translated_text})
 
 @app.get("/get_text/")
 async def speech_to_text(audio_url:str,source_language:str):
+    audioutility_obj=AudioUtility()
+    original_extension=audioutility_obj.audio_Conversion(audio_url)
+    audio_url="temp.wav"
     speech2text_obj=SpeechToText()
     result=speech2text_obj.speech_to_text(audio_url,source_language)
+    os.remove(audio_url)
     if result is None:
         return JSONResponse(status_code=404, content={"message": "No text could be extracted from the audio."})
     return JSONResponse(status_code=200, content={"text": result})
 
 @app.get("/get_speech/")
 async def text_to_speech(text:str,audio_url:str):
+    audioutility_obj=AudioUtility()
+    original_extension=audioutility_obj.audio_Conversion(audio_url)
+    audio_url="temp.wav"
     text2speech_obj=TextToSpeech()
     text2speech_obj.text_to_speech(text,audio_url)
     session = Session()
@@ -368,7 +383,9 @@ async def text_to_speech(text:str,audio_url:str):
         raise ValueError("No audio found in the database")
     
     audio_bytes = target_audio.audio
-    return Response(content=audio_bytes, media_type="audio/wav")
+    os.remove("temp.wav")
+    media_type = f"audio/{original_extension.lstrip('.')}"
+    return Response(content=audio_bytes, media_type=media_type)
 
 @app.get("/audio_segments/")
 async def get_all_audio_segments():
