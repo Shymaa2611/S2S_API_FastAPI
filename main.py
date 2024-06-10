@@ -202,36 +202,42 @@ class TextToSpeech:
    def make_prompt_audio(self,name,audio_path):
      make_prompt(name=name, audio_prompt_path=audio_path)
       
-   def text_to_speech_process(self,segment_id, target_text, audio_prompt):
-     session=Session()
-     preload_models()
-     segment = session.query(Audio_segment).get(segment_id)
-     self.make_prompt_audio(name=f"audio_{segment_id}",audio_path=audio_prompt)
-     audio_array = generate_audio(target_text,f"audio_{segment_id}")
-     temp_file = BytesIO()
-     sf.write(temp_file, audio_array, SAMPLE_RATE, format='wav')
-     temp_file.seek(0)
-     segment.audio = temp_file.getvalue()
-     session.commit()
-     session.close()
-     temp_file.close()
-    #os.remove(temp_file)
+   def split_audio_into_3seconds(self,audio_prompt):
+      sound = AudioSegment.from_file(BytesIO(audio_prompt), format="wav")
+      chunk_length = 3 * 1000  
+      chunks = []
+      for i in range(0, len(sound), chunk_length):
+        chunks.append(sound[i:i + chunk_length])
+      return chunks
 
-   def extract_15_seconds(self,audio_data, start_time, end_time):
-    audio_segment = AudioSegment.from_file(BytesIO(audio_data), format='wav')
-    start_ms = start_time * 1000  
-    end_ms = min((start_time + 15) * 1000, end_time * 1000)  
-    extracted_segment = audio_segment[start_ms:end_ms]
-    temp_wav_path = "temp.wav"
-    extracted_segment.export(temp_wav_path, format="wav")
-    return temp_wav_path
-   
-   def check_audio_duration(self,audio_url):
-    audio, sample_rate = torchaudio.load(audio_url)
-    duration_in_seconds = audio.size(1) / sample_rate
-    return duration_in_seconds > 15
+   def text_to_speech_process(self, segment_id, target_text, audio_prompt):
+    session = Session()
+    preload_models()
+    segment = session.query(Audio_segment).get(segment_id)
+    target_chunks = self.split_text_into_chunks(target_text)
+    audio_chunks = self.split_audio_into_3seconds(audio_prompt=audio_prompt) 
+    concatenated_audio = AudioSegment.silent(duration=0) 
+    for i, chunk in enumerate(target_chunks):
+        audio_chunk = audio_chunks[i % len(audio_chunks)]
+        temp_audio_file = BytesIO()
+        audio_chunk.export(temp_audio_file, format="wav")
+        temp_audio_file.seek(0)
+        self.make_prompt_audio(name=f"audio_{segment_id}_{i}", audio_path=temp_audio_file)
+        audio_array = generate_audio(chunk, f"audio_{segment_id}_{i}")
+        temp_file = BytesIO()
+        sf.write(temp_file, audio_array, SAMPLE_RATE, format='wav')
+        temp_file.seek(0)
+        generated_audio = AudioSegment.from_file(temp_file, format="wav")
+        concatenated_audio += generated_audio
+        temp_file.close()  
+    final_audio_file = BytesIO()
+    concatenated_audio.export(final_audio_file, format="wav")
+    final_audio_file.seek(0)
+    segment.audio = final_audio_file.getvalue()
+    session.commit()
+    session.close()
 
-   def split_text_into_chunks(self,text:str, chunk_size=10):
+   def split_text_into_chunks(self,text:str, chunk_size=6):
     words = text.split()
     chunks = []
     for i in range(0, len(words), chunk_size):
@@ -239,39 +245,31 @@ class TextToSpeech:
         chunks.append(chunk)
     return chunks
    
-   def chunk_to_speech(self, chunks):
-    count=0.0
-    session = Session()
-    for chunk in chunks:
-        audio_array = generate_audio(chunk, prompt="person")
-        temp_file_path = "temp.wav"
-        sf.write(temp_file_path, audio_array, SAMPLE_RATE, format='wav')
-        sound = AudioSegment.from_wav(temp_file_path)
-        
-        self.audioUtility_obj.create_segment(start_time=count,
-                                             end_time=0.0,
-                                             type=None,
-                                             audio=sound)
-        count+=1
-        os.remove(temp_file_path)
-    session.close()
-
    def text_to_speech(self, text: str, audio_url: str):
-    chunks = self.split_text_into_chunks(text, chunk_size=10)
+    session = Session()
     preload_models()
-    if self.check_audio_duration(audio_url):
-        audio = AudioSegment.from_file(audio_url)
-        first_3_seconds = audio[:3000]
-        new_audio_path = "temp_audio.wav"
-        first_3_seconds.export(new_audio_path, format="wav")
-        make_prompt(name="person", audio_prompt_path=new_audio_path)
-        self.chunk_to_speech(chunks)
-        os.remove(new_audio_path)
-    else:
-        make_prompt(name="person", audio_prompt_path=audio_url)
-        self.chunk_to_speech(chunks)
-
+    bytes_data=None
+    with open(audio_url, "rb") as file:
+        bytes_data = file.read()
+    text_chunks = self.split_text_into_chunks(text)
+    audio_chunks = self.split_audio_into_3seconds(audio_prompt=bytes_data)
+    for i, chunk in enumerate(text_chunks):
+        audio_chunk = audio_chunks[i % len(audio_chunks)]
+        temp_audio_file = BytesIO()
+        audio_chunk.export(temp_audio_file, format="wav")
+        temp_audio_file.seek(0)
+        self.make_prompt_audio(name=f"person{i}", audio_path=temp_audio_file)
+        audio_array = generate_audio(chunk,f"person{i}")
+        temp_file = BytesIO()
+        sf.write(temp_file, audio_array, SAMPLE_RATE, format='wav')
+        temp_file.seek(0)
+        generated_audio = AudioSegment.from_file(temp_file, format="wav")
+        if generate_audio:
+            self.audioUtility_obj.create_segment(start_time=i,
+             end_time=0.0,
+             type="speech",audio=generated_audio)
     self.audioUtility_obj.construct_audio()
+    session.close()
 
 class SpeechToSpeechTranslation:
    def __init__(self):
@@ -298,13 +296,7 @@ class SpeechToSpeechTranslation:
             print("Target text is None.")
         else:
            segment_id = segment.id
-           segment_duration = segment.end_time - segment.start_time
-           if segment_duration <=15:
-              self.text2tspeech_obj.text_to_speech_process(segment_id,target_text,segment.audio)
-           else:
-                audio_data= self.text2tspeech_obj.extract_15_seconds(segment.audio,segment.start_time,segment.end_time)
-                self.text2tspeech_obj.text_to_speech_process(segment_id,target_text,audio_data)
-                os.remove(audio_data)
+           self.text2tspeech_obj.text_to_speech_process(segment_id,target_text,segment.audio)
     self.audioUtility_obj.construct_audio()
 
 class SpeechToTextTranslation:
